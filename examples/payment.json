@@ -1,0 +1,25 @@
+{
+  "expected_revision": 0,
+  "event": {
+    "type": "transaction",
+    "event_id": "payment-001",
+    "user_id": "demo",
+    "transaction": {
+      "user_id": "demo",
+      "transaction_id": "new",
+      "source": "LIVE",
+      "transaction_type": "WITHDRAW",
+      "transaction_date": "2026-09-09",
+      "transaction_time": "12:00",
+      "category": "기타",
+      "subcategory": "기타",
+      "merchant": "SYNTHETIC EXAMPLE",
+      "merchant_id": "synthetic",
+      "amount_krw": 50000,
+      "account_id": "a",
+      "card_id": "",
+      "confirm_status": "CONFIRMED",
+      "status": "NORMAL"
+    }
+  }
+}

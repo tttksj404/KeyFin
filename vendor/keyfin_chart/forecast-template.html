@@ -1,0 +1,54 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KeyFin · 예산 기간별 소비 예측</title><style>/*CSS*/
+:root{--muted:#716b80}.workspace{grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:24px}.preview{width:100%}main{max-width:1200px}.flow-card{margin-top:0;padding:24px;border-radius:20px}.flow-container{margin:6px -12px 0}.flow-card h3{font-size:15px;margin:20px 0 2px}.asset-value{margin-top:12px}.period-tag{display:inline-block;background:#f0edff;color:#5140a6;padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.7}.intro{font-size:13px!important}.toolbar{margin:20px 0}.toolbar label{font-size:13px}.toolbar select{min-height:44px}.legend,.helper,.flow-range,.asset-current,.small-label{font-size:12px}.legend{gap:12px}.category-key{width:10px;height:10px;border-radius:3px;display:inline-block}.result-note{font-size:14px;line-height:1.8;margin:16px 0 0}.table-section{margin-top:30px}td,th{padding:12px 8px;font-size:12px}.over{color:#a52c58;font-weight:700}details{margin-top:20px}summary{cursor:pointer;font-size:13px;min-height:44px;padding:12px 0}.day-detail{font-size:12px;line-height:1.8;min-height:44px;color:#635b73}.source{color:#5140a6!important;font-weight:600}.kf-daily-svg{display:block;width:100%;height:auto}.kf-daily-svg [tabindex]:hover,.kf-daily-svg [tabindex]:focus{opacity:.75}.empty-note{font-size:12px;color:var(--muted)}
+@media(max-width:800px){.workspace{grid-template-columns:minmax(0,1fr)}.preview{max-width:430px}.flow-card{padding:20px}.toolbar{align-items:stretch}.toolbar select{width:100%}main{max-width:580px}.app-head{gap:12px}.app-head span{font-size:10px}.period-tag{font-size:12px}}
+</style></head><body><main>
+<header class="app-head"><div class="logo">KeyFin</div><span id="source" class="source"></span></header>
+<h1>내 예산 시작일에 맞춘 소비 예측</h1><p class="intro">예산을 시작한 날부터 한 달 동안의 소비를 확인합니다.</p>
+<div class="toolbar"><label for="case">예산 기간 선택</label><select id="case" aria-label="예산 기간 선택"></select></div>
+<p id="period" class="period-tag"></p><p id="as-of" class="intro"></p><div id="error" class="error hidden" role="alert"></div>
+<div id="results"><div class="workspace" style="margin-top:24px">
+<section class="preview" aria-label="카테고리별 예산 사용률"><div id="budget" class="chart-host"></div><div id="budget-legend" class="legend"><span><i class="key" aria-hidden="true"></i>지금까지 쓴 금액</span><span><i class="key future" aria-hidden="true"></i>종료일까지 예상되는 총금액</span></div><p class="helper">예상 총금액에는 지금까지 쓴 금액도 포함됩니다.<br>막대 오른쪽 숫자는 예상 사용률 · 흰 점선은 예산 100%</p><div id="selection" class="selection" role="status" aria-live="polite"></div><p id="result-note" class="result-note"></p></section>
+<section class="flow-card" aria-label="소비 추이"><div class="flow-top"><h2>예산 기간 누적 소비</h2><span class="small-label">종료일 예측</span></div><div id="asset-value" class="asset-value"></div><div id="asset-current" class="asset-current"></div><div class="legend"><span><i class="line"></i><span id="actual-range"></span></span><span><i class="dash"></i><span id="forecast-range"></span></span></div><div id="flow" class="flow-container"></div><div id="flow-range" class="flow-range"></div>
+<h3>일별 소비 · 카테고리 구성</h3><p id="daily-note" class="helper">기록은 진하게, 기준일 이후 예측은 옅게 표시합니다.</p><div id="daily" class="flow-container"></div><div id="categories" class="legend"></div><div id="day-detail" class="day-detail" role="status" aria-live="polite">막대를 누르거나 키보드로 이동하면 일별 금액을 확인할 수 있습니다.</div></section>
+</div><section class="table-section"><div class="edit-head"><h2 style="font-size:17px">카테고리별 예측</h2><span class="badge">단위 원</span></div><div class="table-scroll"><table><thead><tr><th>카테고리</th><th>기간 예산</th><th>현재 소비</th><th>기간 말 예상 총소비</th><th>예상 사용률</th><th>예산 상태</th></tr></thead><tbody id="rows"></tbody><tfoot id="total"></tfoot></table></div></section>
+<p id="aggregation-note" class="helper"></p><details><summary>일별 데이터 표 보기</summary><div class="table-scroll"><table><thead id="daily-head"></thead><tbody id="daily-rows"></tbody></table></div></details></div>
+<footer class="bottom-note">한 달은 고정 30일이 아닙니다. 다음 달 같은 날짜를 다음 시작일로 삼고, 그 전날까지 계산합니다. 같은 날짜가 없으면 다음 시작일을 그달 마지막 날로 보정합니다.<br>현재 소비와 예상 총소비는 모두 위 예산 기간에 속한 금액입니다.</footer>
+</main><script>/*CHART*/</script><script>/*FLOW*/</script><script>/*DATA*/</script><script>
+const K=KeyFinChart,F=KeyFinFlow,$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let chart;
+$('#case').innerHTML=KEYFIN_CASES.map((d,i)=>'<option value="'+i+'">'+esc(d.question||d.id)+'</option>').join('');
+function render(index){
+ $('#error').classList.add('hidden');$('#results').classList.add('hidden');
+ try{
+  const d=K.normalize(KEYFIN_CASES[index]),m=d.meta,b=d.balance;
+  if(!m.period_start||b?.kind!=='cumulative_expense')throw new TypeError('소비 예측 화면에는 meta.period_start와 cumulative_expense 경로가 필요합니다.');
+  const flow=F.svg(d,KEYFIN_STYLE),daily=F.dailySvg(d),short=s=>s.slice(5).replace('-','/');
+  const synthetic=d.source.startsWith('synthetic');
+  $('#source').textContent=m.source_label||(synthetic?'합성 테스트 데이터 · GPU 실예측 아님':'입력된 예측 결과');
+  $('#daily-note').textContent=m.daily_note||'기록은 진하게, 기준일 이후 예측은 옅게 표시합니다.';
+  $('#aggregation-note').textContent=m.aggregation_note||'';
+  $('#period').textContent='예산 기간 '+m.period_range+' · '+m.period_days+'일';
+  $('#as-of').textContent=(synthetic?'테스트 기준일 ':'기준일 ')+m.as_of+' · 다음 예산 시작일 '+m.next_start;
+  $('#selection').classList.remove('visible');
+  if(chart)chart.destroy();chart=K.mount($('#budget'),d,{style:KEYFIN_STYLE,labelMode:'forecast',scale:'linear',onSelect:r=>{$('#selection').textContent=r.label+' · 현재 '+K.money(r.current)+' → 기간 말 예상 '+K.money(r.forecast);$('#selection').classList.add('visible');}});
+  $('#asset-value').textContent=K.money(d.totalForecast);$('#asset-current').textContent=short(m.as_of)+' 기준 '+K.money(d.totalCurrent)+' 사용';
+  $('#actual-range').textContent='기록 '+short(m.period_start)+' ~ '+short(m.as_of);
+  $('#forecast-range').textContent='예측 '+short(m.as_of)+' ~ '+short(m.horizon_end);
+  $('#flow').innerHTML=flow;$('#daily').innerHTML=daily;
+  const remain=d.totalBudget==null||d.totalForecast==null?null:d.totalBudget-d.totalForecast;
+  $('#flow-range').textContent='기간 예산 '+K.money(d.totalBudget)+' · '+short(m.horizon_end)+' 종료 시 '+(remain==null?'예상 잔액 정보 없음':K.money(Math.abs(remain))+(remain<0?' 초과 예상':' 남을 것으로 예상'));
+  const over=d.categories.filter(r=>r.forecast!=null&&r.budget!=null&&r.forecast>r.budget);
+  $('#result-note').textContent=over.length?over.map(r=>r.label+'은 '+K.money(r.forecast-r.budget)+' 초과 예상').join(' · '):'카테고리별 예산 상태를 아래 표에서 확인하세요.';
+  $('#categories').innerHTML=d.categories.map((r,i)=>'<span><i class="category-key" style="background:'+F.categoryColors[i%F.categoryColors.length]+'"></i>'+esc(r.label)+'</span>').join('');
+  function row(label,budget,current,forecast){const delta=budget==null||forecast==null?null:budget-forecast;return '<tr><td>'+esc(label)+'</td><td>'+K.fmt(budget)+'</td><td>'+K.fmt(current)+'</td><td>'+K.fmt(forecast)+'</td><td>'+K.pct(budget>0&&forecast!=null?forecast/budget*100:null)+'</td><td class="'+(delta<0?'over':'')+'">'+(delta==null?'정보 없음':K.fmt(Math.abs(delta))+(delta<0?' 초과':' 남음'))+'</td></tr>';}
+  $('#rows').innerHTML=d.categories.map(r=>row(r.label,r.budget,r.current,r.forecast)).join('');$('#total').innerHTML=row('전체',d.totalBudget,d.totalCurrent,d.totalForecast);
+  $('#daily-head').innerHTML='<tr><th>날짜</th><th>구분</th>'+d.categories.map(r=>'<th>'+esc(r.label)+'</th>').join('')+'<th>합계</th></tr>';
+  $('#daily-rows').innerHTML=(b.daily||[]).map(r=>'<tr><td>'+r.date+'</td><td>'+(r.date<=m.as_of?'기록':'예측')+'</td>'+r.amounts_krw.map(v=>'<td>'+K.fmt(v)+'</td>').join('')+'<td>'+K.fmt(r.amounts_krw.reduce((s,v)=>s+v,0))+'</td></tr>').join('');
+  $('#day-detail').textContent='막대를 누르거나 키보드로 이동하면 일별 금액을 확인할 수 있습니다.';
+  window.PREVIEW_DATA=d;$('#results').classList.remove('hidden');
+ }catch(e){$('#period').textContent='';$('#as-of').textContent='';$('#error').textContent=e.message;$('#error').classList.remove('hidden');}
+}
+function discloseDay(e){const bar=e.target.closest('.daily-bar');if(bar)$('#day-detail').textContent=bar.getAttribute('aria-label');}
+$('#daily').onclick=discloseDay;$('#daily').addEventListener('focusin',discloseDay);
+$('#case').onchange=()=>render(Number($('#case').value));render(0);
+</script></body></html>

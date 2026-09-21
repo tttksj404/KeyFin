@@ -1,0 +1,13 @@
+{
+  "repository": "https://lab.ssafy.com/s15-fintech-finance-sub1/S15P21A408",
+  "commit": "924c5555032f902d2f77e417dd611593f5ec7576",
+  "source": "ai/KeyFin_Chart/web",
+  "files": {
+    "keyfin-chart.js": "cef425b670b62b4d35cbecd9825dff8da3b71d1db04cdb9bc9a718f5fed3783f",
+    "keyfin-flow.js": "9701b598bd26042424c150cb0163c572301c1f98588aabab6fdcad9909371361",
+    "forecast-template.html": "9500e7c158208b0f90129b97e8fffa8d4e6cba4aab816ba34cc24faefeae5cf2",
+    "demo.css": "5c3d74b4c6bd2d3fa6a309df4935b5fdb7068d9dcc066f9b4d4fa92b3b279df9",
+    "design-tokens.json": "386bc79d268d1d89e44a0eb5141293e37cecc9b36af674832cae70a76dde38cc",
+    "keyfin-chart.d.ts": "eae67bc6c17de57350d8c08bc5d2137e226f69e1049f9a36bb2aa0e833f34529"
+  }
+}

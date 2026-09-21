@@ -1,0 +1,64 @@
+[project]
+name = "fdt-coaching-service"
+version = "0.3.0"
+description = "Persistent AI coaching API using the team's pinned FDT engine"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "pydantic>=2.10,<3",
+    "pydantic-settings>=2,<3",
+    "numpy>=2,<3",
+    "jsonschema>=4.18,<5",
+    "anyio>=4,<5",
+    "httpx2[http2,brotli,zstd]==2.12.0",
+    "tzdata>=2025.2",
+    "typing-extensions>=4.12,<5",
+    "websockets>=17.1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.12", "basedpyright>=1.31"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/coaching_service", "vendor/fdt"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"ENGINE_MANIFEST.json" = "coaching_service/engine_manifest.json"
+"CHART_MANIFEST.json" = "coaching_service/chart_manifest.json"
+"vendor/keyfin_chart" = "coaching_service/chart_assets"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = ["vendor"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D203", "D213", "COM812", "CPY001", "FBT001", "FBT002", "D100", "D101", "D102", "D103", "D104", "D107", "PLR2004", "EM101", "TRY003"]
+
+[tool.ruff.lint.per-file-ignores]
+# Standalone pytest modules, synthetic tokens, and end-to-end assertion sequences.
+"tests/**" = ["S101", "S105", "D", "SLF001", "ARG", "PLR0915"]
+"tests/{test_api,test_engine,test_failures,test_gpu_configuration,test_gpu_model_registry_example,test_payments,test_store,test_twin_rebootstrap,test_backend_multitenant,test_run_gpu_ws_worker_device}.py" = ["INP001"]
+"tests/test_chart*.py" = ["INP001"]
+"scripts/**" = ["T201", "INP001"]
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.11"
+include = ["src/coaching_service"]
+exclude = ["vendor"]
+stubPath = "typings"
+reportUnusedCallResult = "warning"
+reportImplicitStringConcatenation = false
+reportUnnecessaryComparison = false

@@ -1,0 +1,27 @@
+{
+  "commit": "307de59c9d1fde01774388257da27730754e5118",
+  "path": "ai/FDT_Workbench/fdt/",
+  "sha256": {
+    "fdt/__init__.py": "271410e78e33a86d348eadc20377c58da51607085e4c301fcc8e59bf0b0ebd96",
+    "fdt/__main__.py": "79ee6f134c5c5193377cf9b189cbdcc3e2095e49ba9cec310114441c15a917c4",
+    "fdt/cli.py": "e200b8d7ab1077f6c9a359c5ec5f62567aa29a10adef6cb85cc30fafd27eb5f6",
+    "fdt/coaching.py": "eb0eea27c6d3213ac8d631ea21f4de8137880ae32e36cae5a2ee03aab871d910",
+    "fdt/coaching_advice.py": "1173b637712419e3b7672fb9223e7a60a77ec5b5073373ad0e35498a3555bb7e",
+    "fdt/coaching_changes.py": "6b0e9fbf92ccb677a8ae684033645a78b2a2fea35ebaceadfecfd7061f545a06",
+    "fdt/coaching_contract.py": "cb7d5270c9e8609b7625f563ca16388bd343013ad4f6b3be82d8980cd1deee93",
+    "fdt/coaching_projection.py": "452df72b68455f2381cfbda1464725ba79cf3efb858a3e707d29295f5a594cbd",
+    "fdt/coaching_summary.py": "018f1c712f08d377fa641a6a6dba3ad5a53c4043fa7aa02a95c7f97fbf14fb90",
+    "fdt/engine.py": "10fd6331f6ba09abeb7e19358e4a7ae1353c8865a7274324be688351eec49bca",
+    "fdt/errors.py": "95b06d1242ba184c1f51b24830fb6fff05d8ee5b9d7b9d675468e316e85412fd",
+    "fdt/ingest.py": "0743abbfa4fec7c32d2a5cafe9222f86c88b98da8d353d1e4730f490882da708",
+    "fdt/mapping.py": "a7f0e53434b6ded0d375a63ce796689ad7afe5373cacba25e22c9151d62f96b6",
+    "fdt/model.py": "c70fa826ad104e1c4233c5c1a6f6147c3e8ffe751ac239c9bfcfe9068da6f25d",
+    "fdt/schemas/event.json": "8daa83073dcaaa84162f048b626603d418088637cf3f4a9422c6a4da4b494fb1",
+    "fdt/schemas/request.json": "71956f3bf9fd4d1d08a0cb27909abb46a0c66fd157ea21570851b262db281930",
+    "fdt/schemas/result.json": "6aa163b7606b4c340e1794f66beba5026b8250f9923f885b8b3ab99067b4a18d",
+    "fdt/schemas/snapshot.json": "f3989975e52a358e503a79d09b4a25bf819b2b48a9084426038a7a5c1de81a49",
+    "fdt/simulation.py": "7b1e2565badc125fe9fab4e458862efe14a8db2b0bb145dd6042916fcc3603c3",
+    "fdt/store.py": "e57ee7582297449ee7073daf705a97fe2ac754c9c8d2bb326a30ad4d08714695",
+    "fdt/util.py": "05929fba7b6601e973ae3c971d6dc968decc3bf45e8a424fa74a405da165440b"
+  }
+}

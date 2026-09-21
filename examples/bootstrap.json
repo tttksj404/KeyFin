@@ -1,0 +1,32 @@
+{
+  "as_of": "2026-09-09",
+  "transactions": [
+    {
+      "user_id": "demo",
+      "transaction_id": "old",
+      "source": "LIVE",
+      "transaction_type": "WITHDRAW",
+      "transaction_date": "2026-07-01",
+      "transaction_time": "12:00",
+      "category": "기타",
+      "subcategory": "기타",
+      "merchant": "SYNTHETIC EXAMPLE",
+      "merchant_id": "synthetic",
+      "amount_krw": 10000,
+      "account_id": "a",
+      "card_id": "",
+      "confirm_status": "CONFIRMED",
+      "status": "NORMAL"
+    }
+  ],
+  "snapshot": {
+    "as_of": "2026-09-09",
+    "source": "USER_ASSUMPTION",
+    "accounts": [{"account_id": "a", "balance_krw": 1000000}],
+    "cards": [],
+    "known_bills": [],
+    "reserve_krw": 100000,
+    "budgets": {"기타": 100000}
+  },
+  "envelopes": [{"envelope": "기타", "balance_krw": 100000}]
+}

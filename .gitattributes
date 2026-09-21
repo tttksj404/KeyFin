@@ -1,0 +1,7 @@
+# Preserve engine provenance and executed source byte for byte.
+# In particular, Windows core.autocrlf must not change the audited file hashes.
+* -text
+# These whitespace forms belong to the pinned upstream files, not generated output.
+ENGINE_MANIFEST.json whitespace=cr-at-eol
+CHART_MANIFEST.json whitespace=cr-at-eol
+vendor/fdt/coaching_projection.py whitespace=-blank-at-eof
