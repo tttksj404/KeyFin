@@ -1,0 +1,4 @@
+DELETE FROM user_furnitures WHERE id = 7301;
+DELETE FROM user_items WHERE user_id IN (971, 972, 973, 974);
+DELETE FROM items WHERE id BETWEEN 7101 AND 7108;
+DELETE FROM users WHERE id IN (971, 972, 973, 974);

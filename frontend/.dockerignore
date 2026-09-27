@@ -1,0 +1,12 @@
+node_modules
+.expo
+dist
+web-build
+coverage
+.git
+.agents
+.claude
+.env
+.env.*
+*.log
+*.tsbuildinfo

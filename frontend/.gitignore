@@ -1,0 +1,74 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# AI 하네스 — 프론트 개발자 1인 전용이라 로컬 보관 (2026-09-08 추적 해제)
+# 백엔드·AI 팀원의 클론과 MR diff 에 섞이지 않게 한다. 하네스 원천은 .agents/, .claude/ 는 harness:sync 미러다.
+.claude/
+.agents/
+AGENTS.md
+CLAUDE.md
+skills-lock.json
+
+# 프론트 전용 문서 — 계약·명세의 원천은 팀 Notion 이고 여기 있는 건 사본이다
+docs/
+
+# Pencil 작업 파일 — 디자인 확정 원천이지만 프론트 전용이라 로컬 보관 (2026-09-08)
+# 코드가 읽는 산출물(tailwind.config.js·global.css·lib/theme.ts)은 추적하므로 앱 빌드에는 영향이 없다.
+design.pen
+
+# 화면 ↔ Pencil 노드 id 연결 기록. 프론트 개발자 혼자 쓰는 참고 자료라 로컬 보관 (사용자 결정 2026-09-10).
+# 빌드·토큰 검사 입력이 아니라서 없어도 앱은 빌드된다. design.pen 과 함께 백업해 둘 것.
+design/design-map.json
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files — EXPO_PUBLIC_ 변수는 앱 번들에 노출되지만 서버 주소·연동 설정은 개인 환경 값이라 추적하지 않는다.
+# 공유해야 하는 형식과 설명은 .env.example 에만 둔다 (규칙 50).
+.env
+.env.*
+!.env.example
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# Claude Code 작업 기록 — 로컬 전용 (Notion 미러가 공유본)
+WORKLOG.md
+
+# Figma 원본(임포트 소스) — 56MB로 GitHub 한도 초과, 로컬 보관
+*.fig
+
+# Pencil AI 생성 임시 출력. 채택한 원본은 design/images/ai 로 옮겨 .pen 이 참조한다.
+# 앞의 "/" 는 프론트 루트의 images/ 만 가리킨다 — 빼면 assets/images·design/images 까지 잡혀
+# 새 이미지가 조용히 누락된다(2026-09-10 수정).
+/images/

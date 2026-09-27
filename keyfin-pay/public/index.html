@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KeyFin Pay 로그인</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="login">
+  <div class="login-box">
+    <h1>KeyFin Pay</h1>
+    <p>금융망에 등록된 이메일로 로그인하세요.</p>
+    <form id="login-form">
+      <label for="userId">이메일</label>
+      <input id="userId" class="input" type="email" placeholder="user@ssafy.com" required autofocus />
+      <button class="btn btn-primary btn-lg" type="submit" id="login-btn">로그인</button>
+    </form>
+    <div id="login-error" class="note note-neg hidden" role="alert"></div>
+  </div>
+  <script type="module">
+    import { getUser } from '/common.js';
+    if (getUser()?.userKey) location.href = '/pay.html';
+    const form = document.getElementById('login-form');
+    const errBox = document.getElementById('login-error');
+    const btn = document.getElementById('login-btn');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errBox.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = '확인 중...';
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: document.getElementById('userId').value.trim() }),
+        });
+        const result = await res.json();
+        if (result.ok) {
+          localStorage.setItem('keyfinPayUser', JSON.stringify(result));
+          location.href = '/pay.html';
+          return;
+        }
+        errBox.textContent = result.message;
+        errBox.classList.remove('hidden');
+      } catch (err) {
+        errBox.textContent = '로그인 요청 실패: ' + (err?.message || err);
+        errBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '로그인';
+      }
+    });
+  </script>
+</body>
+</html>

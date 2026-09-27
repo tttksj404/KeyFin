@@ -1,0 +1,117 @@
+{
+  "name": "fintech-mobile",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "packageManager": "pnpm@12.4.2",
+  "dependencies": {
+    "@lottiefiles/dotlottie-react": "^0.13.5",
+    "@rn-primitives/dialog": "^1.5.2",
+    "@rn-primitives/portal": "^1.5.3",
+    "@rn-primitives/separator": "^1.5.2",
+    "@rn-primitives/slot": "^1.5.2",
+    "@shopify/react-native-skia": "2.6.2",
+    "@tanstack/react-query": "^5.102.8",
+    "axios": "^1.20.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "expo": "~57.0.18",
+    "expo-constants": "~57.0.16",
+    "expo-crypto": "~57.0.3",
+    "expo-dev-client": "~57.0.19",
+    "expo-font": "~57.0.2",
+    "expo-linking": "~57.0.8",
+    "expo-local-authentication": "~57.0.2",
+    "expo-notifications": "~57.0.19",
+    "expo-router": "~57.0.17",
+    "expo-secure-store": "~57.0.2",
+    "expo-status-bar": "~57.0.1",
+    "expo-updates": "~57.0.23",
+    "lottie-react-native": "~7.3.8",
+    "lucide-react-native": "^1.35.0",
+    "nativewind": "^4.2.6",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
+    "react-native-web": "^0.21.2",
+    "react-native-webview": "13.16.1",
+    "react-native-worklets": "0.10.1",
+    "tailwind-merge": "^3.6.0",
+    "zustand": "^5.0.15"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "lint": "expo lint",
+    "tokens:sync": "node scripts/sync-pen-tokens.cjs && node scripts/sync-tokens.cjs",
+    "tokens:check": "node scripts/sync-pen-tokens.cjs --check && node scripts/sync-tokens.cjs --check && node scripts/check-tokens.cjs",
+    "harness:sync": "node scripts/sync-harness.cjs",
+    "harness:check": "node scripts/check-harness.cjs",
+    "harness:backup": "node scripts/harness-backup.cjs",
+    "harness:restore": "node scripts/harness-restore.cjs",
+    "ui:add": "pnpm dlx shadcn@latest add --yes",
+    "test": "jest",
+    "figma:build": "node scripts/figma/build-plugin.cjs",
+    "figma:smoke": "node scripts/figma/run-smoke.cjs"
+  },
+  "private": true,
+  "devDependencies": {
+    "@babel/plugin-transform-react-jsx": "7.29.7",
+    "@react-native/jest-preset": "0.86.3",
+    "@testing-library/react-native": "^14.0.1",
+    "@types/jest": "29.5.14",
+    "@types/react": "~19.2.4",
+    "babel-preset-expo": "~57.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^57.0.2",
+    "jest": "~29.7.0",
+    "jest-expo": "~57.0.5",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~6.0.3"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/android/",
+      "/ios/"
+    ],
+    "collectCoverageFrom": [
+      "lib/**/*.ts",
+      "features/**/*.{ts,tsx}",
+      "components/**/*.tsx",
+      "!lib/theme.ts",
+      "!components/ui/*.tsx"
+    ],
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|standard-navigation|@rn-primitives|lucide-react-native|@shopify/react-native-skia|react-native-gesture-handler|react-native-worklets|lottie-react-native))",
+      "/node_modules/react-native-reanimated/plugin/",
+      "/node_modules/@react-native/babel-preset/"
+    ],
+    "transform": {
+      "\\.mjs$": [
+        "babel-jest",
+        {
+          "caller": {
+            "name": "metro",
+            "bundler": "metro",
+            "platform": "ios"
+          }
+        }
+      ]
+    },
+    "setupFiles": [
+      "@shopify/react-native-skia/jestSetup.js",
+      "react-native-gesture-handler/jestSetup.js",
+      "<rootDir>/jest.setup.js"
+    ],
+    "resolver": "react-native-worklets/jest/resolver"
+  }
+}

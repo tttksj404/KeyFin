@@ -1,0 +1,166 @@
+/* KeyFin Pay 공통 셸 — 모든 화면(로그인·결제·결제 내역·정기결제)이 함께 쓴다.
+   값은 wise.com 실측 디자인 시스템(keyfin-pay-wise/DESIGN.md)을 따른다.
+   화면별 스타일은 pay.css / history.css / subscriptions.css 에 있다. */
+:root{
+  --kf:"Pretendard Variable",Pretendard,system-ui,sans-serif;
+  --kd:"Wanted Sans Variable","Wanted Sans",var(--kf);
+  --primary:#9FE870; --on-primary:#163300; --primary-hover:#CDFFAD; --pale:#E2F6D5; --pale-2:#D6F0C4;
+  --ink:#0E0F0C; --forest:#163300; --body-c:#454745; --mute:#6B6D6A;
+  --canvas:#FFFFFF; --soft:#E8EBE6; --soft-2:#DCE0D9; --hov:rgba(22,51,0,.08); --hair:rgba(14,15,12,.12);
+  --pos-deep:#054D28; --warn:#FFD11A; --warn-content:#4A3B1C; --neg:#D03238; --neg-deep:#A72027;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--kf);font-size:18px;line-height:26px;letter-spacing:-.006em;color:var(--body-c);background:var(--canvas);overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
+button,input,select{font:inherit;color:inherit;letter-spacing:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--forest);outline-offset:2px}
+.hidden{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- 셸: pay.html과 같은 3열 격자 ---------- */
+.app{height:100%;display:grid;grid-template-rows:auto 1fr;max-width:1320px;margin:0 auto;padding:0 32px}
+.cols{display:grid;grid-template-columns:196px minmax(0,1fr) 404px;column-gap:36px}
+.top{align-items:center;height:80px}
+.brand{font-family:var(--kd);font-weight:900;font-size:30px;letter-spacing:-.5px;color:var(--forest);text-decoration:none;white-space:nowrap}
+.nav{display:flex;gap:4px;margin-left:-12px}
+.nav a{padding:8px 12px;border-radius:9999px;font-size:18px;font-weight:600;line-height:26px;color:var(--forest);text-decoration:none;transition:background .15s}
+.nav a:hover,.nav a.on{background:var(--hov)}
+.who{display:flex;justify-content:flex-end;align-items:center;gap:16px;font-size:16px;color:var(--body-c)}
+.who b{color:var(--ink);font-weight:600}
+.main{min-height:0;padding-bottom:28px}
+
+/* ---------- 버튼 (Wise: 전부 알약) ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:9999px;font-weight:600;white-space:nowrap;transition:background .15s,color .15s}
+.btn-md{height:48px;padding:0 24px;font-size:16px}
+.btn-sm{height:36px;padding:0 16px;font-size:15px}
+.btn-lg{height:64px;padding:0 24px;font-size:20px;letter-spacing:-.22px;width:100%}
+.btn-primary{background:var(--primary);color:var(--on-primary)}
+.btn-primary:hover:not(:disabled){background:var(--primary-hover)}
+.btn-primary:active:not(:disabled){background:#8EDC5C}
+.btn-secondary{background:var(--soft);color:var(--ink)}
+.btn-secondary:hover:not(:disabled){background:var(--soft-2)}
+.btn-tertiary{background:var(--canvas);color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.btn-tertiary:hover:not(:disabled){background:var(--hov)}
+.btn-danger{background:var(--neg);color:#FFFFFF}
+.btn-danger:hover:not(:disabled){background:var(--neg-deep)}
+.btn-danger-text{background:var(--canvas);color:var(--neg-deep);box-shadow:inset 0 0 0 1px var(--neg)}
+.btn-danger-text:hover:not(:disabled){background:#FBEAEA}
+.btn:disabled{background:var(--soft);color:#5E615C;box-shadow:none;cursor:default}
+.who .btn{height:42px;padding:0 16px;font-size:16px}
+
+/* ---------- 왼쪽 색인 (pay.html의 업종 색인과 같은 모양) ---------- */
+.cats{position:relative;overflow-y:auto;padding:4px 4px 28px 0;scrollbar-width:none}
+.cats::-webkit-scrollbar{display:none}
+.cat-ind{position:absolute;left:0;top:0;border-radius:9999px;background:var(--primary);pointer-events:none;
+  transition:transform .32s cubic-bezier(.3,.9,.3,1),height .32s cubic-bezier(.3,.9,.3,1),width .32s cubic-bezier(.3,.9,.3,1)}
+.cat{position:relative;display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;background:none;border:0;border-radius:9999px;
+  padding:8px 14px;text-align:left;font-size:17px;font-weight:600;color:var(--forest);transition:background .15s}
+.cat:hover:not(.on){background:var(--hov)}
+.cat span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat em{font-style:normal;font-size:15px;font-weight:400;color:var(--mute);font-variant-numeric:tabular-nums}
+.cat.on,.cat.on em{color:var(--on-primary)}
+.cat.all{margin-bottom:8px}
+
+/* ---------- 가운데 목록 ---------- */
+.dir{display:flex;flex-direction:column;min-height:0}
+.list{overflow-y:auto;min-height:0;margin-left:-16px;padding:0 10px 36px 16px;scrollbar-width:thin;scrollbar-color:var(--soft) transparent;
+  -webkit-mask:linear-gradient(#000 calc(100% - 36px),#0000);mask:linear-gradient(#000 calc(100% - 36px),#0000)}
+.search{position:relative;margin:0 0 20px}
+.search input{width:100%;background:var(--canvas);border:1px solid var(--ink);border-radius:12px;padding:16px 18px;font-size:20px;font-weight:600;letter-spacing:-.2px;color:var(--ink)}
+.search input::placeholder{color:var(--mute);font-weight:400}
+.search input:focus{outline:none;box-shadow:0 0 0 1px var(--ink)}
+.page-h{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:4px 0 18px}
+.page-h h1{margin:0;font-size:25px;line-height:32px;font-weight:600;letter-spacing:-.37px;color:var(--ink)}
+.page-h p{margin:0;font-size:16px;color:var(--mute)}
+.grp{margin-bottom:26px}
+.grp h3{margin:0 0 4px;padding:6px 0;display:flex;align-items:baseline;gap:12px;font-size:25px;line-height:32px;font-weight:600;letter-spacing:-.37px;color:var(--ink)}
+.grp h3 em{font-style:normal;font-size:17px;font-weight:400;color:var(--mute)}
+.empty{padding:56px 0;text-align:left}
+.empty b{display:block;font-size:21px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.empty p{margin:0 0 18px;font-size:16px;color:var(--mute)}
+
+/* ---------- 오른쪽 패널 ---------- */
+.side{display:flex;flex-direction:column;gap:16px;min-height:0;overflow-y:auto;scrollbar-width:none;padding-bottom:14px}
+.side::-webkit-scrollbar{display:none}
+.card{border-radius:28px;padding:24px}
+.card-green{background:var(--pale)}
+.card-sage{background:var(--soft)}
+.card-dark{background:var(--ink);color:var(--soft)}
+.card h2{margin:0 0 14px;font-size:21px;line-height:28px;font-weight:600;letter-spacing:-.3px;color:var(--ink)}
+.stat-label{font-size:16px;font-weight:600;color:var(--forest)}
+.stat-big{font-family:var(--kd);font-weight:900;font-size:50px;line-height:1;letter-spacing:-.5px;color:var(--ink);margin:12px 0 14px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat-big small{font-family:var(--kf);font-size:22px;font-weight:600;margin-left:4px;letter-spacing:0}
+.stat-row{display:flex;gap:18px;font-size:16px;color:var(--body-c)}
+.stat-row b{color:var(--ink);font-weight:600}
+.card-dark .stat-label{color:var(--primary)}
+.card-dark .stat-big{color:var(--primary)}
+.card-dark .stat-row{color:#C9CDC6}
+.card-dark .stat-row b{color:#FFFFFF}
+
+/* ---------- 폼 ---------- */
+.field{margin-bottom:16px}
+.field > label,.field > .lbl,.two label{display:block;margin-bottom:8px;font-size:15px;font-weight:600;color:var(--ink)}
+.input{width:100%;min-width:0;height:48px;background:var(--canvas);border:1px solid var(--ink);border-radius:12px;padding:0 16px;font-size:16px;color:var(--ink)}
+.input:focus{outline:none;box-shadow:0 0 0 1px var(--ink)}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{height:36px;padding:0 14px;border:0;border-radius:9999px;background:var(--canvas);color:var(--ink);font-size:15px;font-weight:600;transition:background .15s}
+.seg button:hover:not(.on){background:var(--soft-2)}
+.seg button.on{background:var(--ink);color:var(--primary)}
+
+/* ---------- 상태 표시: 글자 + 색 (색만으로 구분하지 않는다) ---------- */
+.badge{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:9999px;font-size:14px;font-weight:600;white-space:nowrap}
+.badge-pos{background:var(--pale);color:var(--pos-deep)}
+.badge-warn{background:#FFF1B8;color:var(--warn-content)}
+.badge-off{background:var(--soft);color:var(--body-c)}
+.badge-neg{background:#FBE3E4;color:var(--neg-deep)}
+
+.note{display:flex;gap:10px;align-items:flex-start;border-radius:16px;padding:14px 16px;font-size:15px;line-height:22px;margin:0 0 16px}
+.note-neg{background:#FBE3E4;color:var(--neg-deep)}
+.note-pos{background:var(--pale);color:var(--pos-deep)}
+.note b{font-weight:700}
+
+/* ---------- 확인 대화상자 · 알림 ---------- */
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(14,15,12,.42)}
+.dialog{width:100%;max-width:420px;background:var(--canvas);border-radius:24px;padding:28px 24px 24px;box-shadow:0 4px 12px rgba(14,15,12,.18)}
+.dialog h2{margin:0 0 8px;font-size:23px;line-height:30px;font-weight:600;letter-spacing:-.35px;color:var(--ink)}
+.dialog p{margin:0 0 22px;font-size:16px;line-height:24px;color:var(--body-c)}
+.dialog p b{color:var(--ink);font-weight:600}
+.dialog .acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toast{position:fixed;left:50%;bottom:28px;z-index:50;transform:translateX(-50%);max-width:calc(100% - 32px);background:var(--ink);color:#FFFFFF;border-radius:24px;padding:12px 22px;font-size:16px;font-weight:600;line-height:22px;text-align:center}
+
+@media (max-width:1360px){ .cols{grid-template-columns:168px minmax(0,1fr) 376px;column-gap:26px} }
+@media (max-width:900px){
+  body{overflow:auto}
+  .app{display:block;height:auto;padding:0 16px}
+  .top{display:flex;flex-wrap:wrap;height:auto;padding:16px 0 6px;gap:6px 18px}
+  .top .nav{order:3;width:100%;margin-left:-12px}
+  .top .who{margin-left:auto}
+  .main{display:flex;flex-direction:column;padding-bottom:48px}
+  .main .cats{order:1}
+  /* 모바일: 요약·필터 → 목록 → .later(새 구독 폼 등) 순서 */
+  .main .side{display:contents}
+  .main .side > *{order:2;margin-bottom:16px}
+  .main .side > .later{order:4;margin:24px 0 0}
+  .main .dir{order:3}
+  .cats{display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;margin:6px -16px 14px;padding:4px 16px;white-space:nowrap}
+  .cat{width:auto;flex:none}
+  .cat.all{margin:0}
+  .list{overflow:visible;-webkit-mask:none;mask:none;margin-left:-12px;padding:0 0 0 12px}
+  .stat-big{font-size:42px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- 로그인 (index.html) ---------- */
+body.login{overflow:auto;background:var(--canvas)}
+.login-box{max-width:440px;margin:12vh auto 0;background:var(--soft);border-radius:28px;padding:40px 32px 32px}
+.login-box h1{margin:0 0 10px;font-family:var(--kd);font-weight:900;font-size:36px;line-height:1.05;letter-spacing:-.6px;color:var(--forest)}
+.login-box p{margin:0 0 28px;font-size:16px;line-height:24px;color:var(--body-c)}
+.login-box label{display:block;margin:0 0 8px;font-size:15px;font-weight:600;color:var(--ink)}
+.login-box .input{margin-bottom:12px}
+.login-box .note{margin:16px 0 0}
+@media (max-width:640px){ .login-box{margin:6vh 16px 0;padding:32px 22px 24px;border-radius:24px} }
+
+/* ---------- 목록 불러오는 중 ---------- */
+.loading{padding:40px 0;font-size:16px;color:var(--mute)}

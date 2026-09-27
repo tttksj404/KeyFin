@@ -1,0 +1,18 @@
+allowBuilds:
+  '@shopify/react-native-skia': true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - expo-font@57.0.2
+  - '@expo/cli@57.0.20'
+  - '@expo/env@2.4.3'
+  - '@expo/fingerprint@0.20.11'
+  - '@expo/metro-config@57.0.12'
+  - expo-constants@57.0.16
+  - expo@57.0.18
+  - expo-notifications@57.0.19
+# NativeWind babel이 주입하는 react-native-css-interop/jsx-runtime을 Metro가 앱 파일에서 해석할 수 있도록 루트에 노출한다
+publicHoistPattern:
+  - react-native-css-interop
+
+# Keep native dependency paths identical on Windows and EAS Linux for runtime fingerprints.
+virtualStoreDirMaxLength: 60

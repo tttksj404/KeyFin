@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KeyFin Pay 결제 내역</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/history.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar top cols">
+    <a class="brand" href="/pay.html">KeyFin Pay</a>
+    <nav class="nav">
+      <a href="/pay.html">결제</a>
+      <a href="/history.html">결제 내역</a>
+      <a href="/subscriptions.html">정기결제</a>
+    </nav>
+    <div class="who"><span id="who-name"></span><button type="button" id="logout-btn" class="btn btn-secondary">로그아웃</button></div>
+  </header>
+
+  <main class="main cols">
+    <div class="cats" id="cards" role="group" aria-label="카드 선택"><div class="cat-ind" id="cat-ind"></div></div>
+
+    <section class="dir">
+      <div class="search">
+        <input id="q" type="search" autocomplete="off" placeholder="가맹점 이름으로 찾기" aria-label="가맹점 이름으로 찾기" />
+      </div>
+      <div id="err" class="note note-neg hidden" role="alert"></div>
+      <div class="list" id="list"><div class="loading">카드를 불러오는 중이에요</div></div>
+    </section>
+
+    <aside class="side">
+      <div class="card card-green">
+        <div class="stat-label" id="s-label">이 기간 결제</div>
+        <div class="stat-big" id="s-total">0<small>원</small></div>
+        <div class="stat-row"><span>승인 <b id="s-ok">0</b>건</span><span>취소 <b id="s-cancel">0</b>건</span></div>
+      </div>
+      <div class="card card-sage">
+        <h2>기간</h2>
+        <div class="field">
+          <div class="seg" id="range" role="group" aria-label="빠른 기간">
+            <button type="button" data-days="7">1주일</button>
+            <button type="button" data-days="30" class="on">1개월</button>
+            <button type="button" data-days="90">3개월</button>
+          </div>
+        </div>
+        <div class="two field">
+          <div><label for="start">시작일</label><input class="input num" id="start" type="date" /></div>
+          <div><label for="end">종료일</label><input class="input num" id="end" type="date" /></div>
+        </div>
+        <button type="button" class="btn btn-primary btn-lg" id="load">조회</button>
+      </div>
+    </aside>
+  </main>
+</div>
+<script type="module" src="/history.js"></script>
+</body>
+</html>

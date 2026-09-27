@@ -1,0 +1,48 @@
+/* 정기결제 화면 전용 스타일. 공통 셸은 style.css */
+/* 구독 한 건 */
+.sub{margin-left:-16px;padding:16px;border-radius:24px;transition:background .15s}
+.sub:hover,.sub.open{background:var(--hov)}
+.sub .l1{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 18px;align-items:start}
+.sub .nm{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.25px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub .nm small{margin-left:8px;font-size:15px;font-weight:400;color:var(--mute)}
+.sub .price{font-size:16px;color:var(--body-c);font-variant-numeric:tabular-nums}
+.sub .price b{font-weight:600;color:var(--ink)}
+.sub .next{text-align:right;font-size:14px;line-height:20px;color:var(--mute)}
+.sub .next b{display:block;font-size:18px;line-height:26px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.sub .next .dday{color:var(--forest);font-weight:600}
+.sub .l2{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.sub .l2 .badge{margin-right:6px}
+.sub .l2 .spacer{flex:1}
+.sub.canceled .nm,.sub.canceled .price b,.sub.canceled .next b{color:var(--mute)}
+.hist{margin:14px 0 2px;padding:14px 18px;background:var(--canvas);border-radius:18px}
+.hist h4{margin:0 0 6px;font-size:15px;font-weight:600;color:var(--ink)}
+.hist ol{margin:0;padding:0;list-style:none}
+.hist li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:baseline;padding:6px 0;font-size:15px;font-variant-numeric:tabular-nums}
+.hist li span:nth-child(2){color:var(--ink);font-weight:600;text-align:right}
+.hist .ok{color:var(--pos-deep);font-weight:600}
+.hist .fail{color:var(--neg-deep);font-weight:600}
+.hist .none{color:var(--mute);font-size:15px}
+
+/* 새 구독 폼 */
+.svc{display:flex;flex-direction:column;gap:6px}
+.svc label{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--canvas);cursor:pointer;transition:box-shadow .15s}
+.svc label:hover{box-shadow:inset 0 0 0 1px var(--hair)}
+.svc input{position:absolute;opacity:0;pointer-events:none}
+.svc .dot{width:20px;height:20px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--mute);display:grid;place-items:center}
+.svc input:checked + .dot{box-shadow:inset 0 0 0 6px var(--forest)}
+.svc input:focus-visible + .dot{outline:2px solid var(--forest);outline-offset:2px}
+.svc .t{font-size:16px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.svc .t small{font-weight:400;color:var(--mute);margin-left:6px}
+.svc .p{font-size:15px;color:var(--body-c);font-variant-numeric:tabular-nums}
+.svc label:has(input:checked){box-shadow:inset 0 0 0 2px var(--forest)}
+.stepper{display:grid;grid-template-columns:48px 1fr 48px;gap:6px}
+.stepper button{height:48px;border:0;border-radius:9999px;background:var(--canvas);font-size:22px;font-weight:600;color:var(--ink)}
+.stepper button:hover{background:var(--soft-2)}
+.stepper .input{text-align:center;font-weight:600}
+@media (max-width:900px){
+  .sub .l2 .spacer{display:none}
+}
+
+/* 불러오는 중 · 없음 안내 */
+.form-msg{margin:0;padding:6px 0;font-size:15px;line-height:22px;color:var(--body-c)}
+.hist .none.fail{color:var(--neg-deep)}

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KeyFin Pay 정기결제</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/subscriptions.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar top cols">
+    <a class="brand" href="/pay.html">KeyFin Pay</a>
+    <nav class="nav">
+      <a href="/pay.html">결제</a>
+      <a href="/history.html">결제 내역</a>
+      <a href="/subscriptions.html">정기결제</a>
+    </nav>
+    <div class="who"><span id="who-name"></span><button type="button" id="logout-btn" class="btn btn-secondary">로그아웃</button></div>
+  </header>
+
+  <main class="main cols">
+    <div class="cats" id="filters" role="group" aria-label="상태로 거르기"><div class="cat-ind" id="cat-ind"></div></div>
+
+    <section class="dir">
+      <div class="page-h"><h1 id="h1">구독 전체</h1><p id="h1-sub"></p></div>
+      <div id="err" class="note note-neg hidden" role="alert"></div>
+      <div class="list" id="list"><div class="loading">정기결제를 불러오는 중이에요</div></div>
+    </section>
+
+    <aside class="side">
+      <div class="card card-dark">
+        <div class="stat-label">매달 나가는 돈</div>
+        <div class="stat-big" id="s-total">0<small>원</small></div>
+        <div class="stat-row"><span>활성 <b id="s-active">0</b>건</span><span>일시정지 <b id="s-paused">0</b>건</span></div>
+      </div>
+
+      <form class="card card-sage later" id="form" novalidate>
+        <h2>새 구독</h2>
+        <div class="field">
+          <span class="lbl" id="svc-l">서비스</span>
+          <div class="svc" id="svc" role="radiogroup" aria-labelledby="svc-l"><p class="form-msg">서비스를 불러오는 중이에요</p></div>
+        </div>
+        <div class="field">
+          <span class="lbl" id="card-l">결제 카드</span>
+          <div class="seg" id="card" role="group" aria-labelledby="card-l"><p class="form-msg">카드를 불러오는 중이에요</p></div>
+        </div>
+        <div class="field">
+          <span class="lbl" id="cycle-l">결제 주기</span>
+          <div class="seg" id="cycle" role="group" aria-labelledby="cycle-l">
+            <button type="button" data-v="MONTHLY" class="on" aria-pressed="true">매달</button>
+            <button type="button" data-v="DAILY" aria-pressed="false">매일</button>
+          </div>
+        </div>
+        <div class="field" id="payday-f">
+          <label for="payday">매달 결제일</label>
+          <div class="stepper">
+            <button type="button" id="pd-dn" aria-label="하루 앞으로">−</button>
+            <input class="input num" id="payday" type="number" min="1" max="31" value="1" inputmode="numeric" />
+            <button type="button" id="pd-up" aria-label="하루 뒤로">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="start">시작일</label>
+          <input class="input num" id="start" type="date" required />
+        </div>
+        <div id="f-note" class="note hidden" role="status"></div>
+        <button type="submit" class="btn btn-primary btn-lg" id="submit">구독 시작하기</button>
+      </form>
+    </aside>
+  </main>
+</div>
+<script type="module" src="/subscriptions.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+HELP.md
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### KeyFin — 비밀값·로컬 설정 (커밋 금지) ###
+# 환경 변수 파일 (DB 비밀번호, SSAFY 금융망 apiKey, JWT secret)
+.env
+*.env
+# 로컬 전용 스프링 설정 오버라이드
+application-local.properties
+application-local.yml
+application-secret.properties
+application-secret.yml
+# Firebase Admin 서비스 계정 키 (FCM — 유출 시 프로젝트 전체 탈취)
+firebase-service-account*.json
+*-firebase-adminsdk-*.json
+
+### 로그 ###
+*.log
+logs/

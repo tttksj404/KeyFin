@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KeyFin Pay 결제</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css" />
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=gambarino@400&display=swap" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/pay.css" />
+</head>
+<body>
+<div class="app">
+  <header class="topbar top cols">
+    <a class="brand" href="/pay.html">KeyFin Pay</a>
+    <nav class="nav">
+      <a href="/pay.html">결제</a>
+      <a href="/history.html">결제 내역</a>
+      <a href="/subscriptions.html">정기결제</a>
+    </nav>
+    <div class="who"><span id="who-name"></span><button type="button" id="logout-btn" class="btn btn-secondary">로그아웃</button></div>
+  </header>
+
+  <main class="main cols" id="main">
+    <div class="cats" id="cats" role="group" aria-label="업종"><div class="cat-ind" id="cat-ind"></div></div>
+
+    <section class="dir">
+      <div class="search">
+        <input id="q" type="search" autocomplete="off" placeholder="어디서 결제할까요?" aria-label="가맹점 검색" />
+        <kbd>/</kbd>
+        <div class="hint">이름, 업종, 초성으로 찾을 수 있어요. 예: ㅅㅌㅂㅅ</div>
+      </div>
+      <div id="err" class="note note-neg hidden" role="alert"></div>
+      <div class="recent hidden" id="recent" role="group" aria-label="최근 결제한 곳"></div>
+      <div class="list" id="list"><div class="loading">가맹점을 불러오는 중이에요</div></div>
+    </section>
+
+    <aside class="register" id="register" aria-label="계산대" tabindex="-1">
+      <div class="reg-bar"><b>계산대</b><button type="button" class="reg-close" id="reg-close" aria-label="계산대 닫기">닫기<svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+      <div class="printer" id="printer">
+        <span class="id">KF-01</span>
+        <span class="st"><i></i><span id="p-st">대기 중</span></span>
+        <div class="slot"></div>
+      </div>
+      <div class="paper" id="paper">
+        <section class="t-entry" id="entry">
+          <div class="t-merch">
+            <div class="nm ph" id="t-nm">가맹점을 고르세요</div>
+            <div class="meta" id="t-meta">목록이나 최근 결제에서 고르면 여기에 찍혀요</div>
+          </div>
+          <div class="perf"></div>
+          <div class="amt"><span class="num zero" id="t-num">0</span><span class="won">원</span></div>
+          <div class="amt-note" id="t-note" role="status">숫자 키로도 입력할 수 있어요</div>
+          <div class="quick" id="quick">
+            <button type="button" data-add="1000">+1천</button>
+            <button type="button" data-add="5000">+5천</button>
+            <button type="button" data-add="10000">+1만</button>
+            <button type="button" data-add="50000">+5만</button>
+          </div>
+          <div class="pad" id="pad"></div>
+          <div class="perf"></div>
+          <div class="cards-lbl"><span>결제 카드</span><b id="card-nm"></b></div>
+          <div class="cards" id="cards"></div>
+          <button type="button" class="paybtn" id="pay" disabled>가맹점을 먼저 고르세요</button>
+        </section>
+
+        <section class="t-receipt" id="receipt" hidden>
+          <div class="rc-head"><div class="ok">승인 완료<small id="r-time"></small></div></div>
+          <div class="perf"></div>
+          <dl class="lines" id="r-lines"></dl>
+          <div class="perf"></div>
+          <div class="total"><span>합계</span><b id="r-total"></b></div>
+          <div class="perf"></div>
+          <svg class="bar" id="r-bar" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div class="bar-no" id="r-no"></div>
+          <div class="thanks">결제 내역에도 바로 남았어요</div>
+          <button type="button" class="paybtn" id="next">다음 결제</button>
+        </section>
+      </div>
+    </aside>
+  </main>
+</div>
+<script type="module" src="/pay.js"></script>
+</body>
+</html>

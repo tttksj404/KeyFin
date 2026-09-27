@@ -1,0 +1,68 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: keyfin-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: keyfin
+      MYSQL_USER: keyfin
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-time-zone=+09:00
+    ports:
+      - "3307:3306"   # 호스트 3306은 로컬 MySQL80 서비스가 점유 중 → 3307로 매핑
+    volumes:
+      - keyfin-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "keyfin", "-p${DB_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: keyfin-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    container_name: keyfin-app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/keyfin?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: keyfin
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-30m}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-336h}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:[*],https://localhost:[*],http://127.0.0.1:[*],https://j15a408.p.ssafy.io}
+      FINANCE_API_BASE_URL: ${FINANCE_API_BASE_URL}
+      FINANCE_API_KEY: ${FINANCE_API_KEY}
+      FINANCE_API_CONNECT_TIMEOUT: ${FINANCE_API_CONNECT_TIMEOUT:-3s}
+      FINANCE_API_READ_TIMEOUT: ${FINANCE_API_READ_TIMEOUT:-5s}
+      FINANCE_API_MAX_ATTEMPTS: ${FINANCE_API_MAX_ATTEMPTS:-3}
+      FINANCE_API_RETRY_BASE_DELAY: ${FINANCE_API_RETRY_BASE_DELAY:-100ms}
+      FINANCE_API_RETRY_MAX_DELAY: ${FINANCE_API_RETRY_MAX_DELAY:-1s}
+      FINANCE_API_RETRY_TIME_LIMIT: ${FINANCE_API_RETRY_TIME_LIMIT:-8s}
+    ports:
+      - "8080:8080"
+
+volumes:
+  keyfin-mysql-data:
+
+# 사용법
+#   인프라만 (로컬 개발 — 앱은 IDE/gradlew bootRun):  docker compose up -d mysql redis
+#   전체 (앱 컨테이너 포함):                           docker compose up -d --build
+# 비밀번호는 같은 폴더 .env 파일에서 읽음 (.env.example 참고, 커밋 금지)
