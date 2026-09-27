@@ -1,6 +1,6 @@
 # 기간 합계 예측 실험
 
-제품 실행 코드는 `src/coaching_service`, 이 폴더는 연구 실행 코드, 검증 코드는 `tests/forecast/test_aggregate*.py`입니다. 원자료·입력·가중치·사례별 결과는 저장소 밖의 비공개 작업 디렉터리에 보관합니다. 요약 결과와 해석은 R15 보고서에 있습니다.
+제품 실행 코드는 `src/coaching_service`, 이 폴더는 연구 실행 코드, 검증 코드는 `tests/forecast/test_aggregate*.py`입니다. 원자료·입력·가중치·사례별 결과는 저장소 밖의 비공개 작업 디렉터리에 보관합니다. 요약 결과와 해석은 [R15 보고서](../../../docs/aggregate-forecast-r15.md)에 있습니다.
 
 ## 비교 대상과 실행 순서
 

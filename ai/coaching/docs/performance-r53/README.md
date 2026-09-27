@@ -63,7 +63,7 @@ route:review는 결정론 게이트로 24 → 36 전망(forecast/risk 40/40 무�
 | `56ff6c8` | FP8 vLLM 서빙(9.1x)·결정론 게이트 확대·예측 게이트 판정가능성·시각화 | 1216 tests |
 | `345542a` | 자연어 일시불 구매 what-if Phase 1 (현금+단일카드, 판정 경계버그 수정) | 1228 tests |
 | `d0884b2` | 카탈로그 확장 안전 기반(충돌 가드·검증·비서빙 대기)·out_of_scope 개선 | 1349 tests |
-| `bacea95` | 카탈로그 후보 8건 검토 패킷(미서빙, candidates) | — |
+| `bacea95` | 카탈로그 후보 8건 검토 패킷(미서빙, [candidates](../catalog-candidates-pending.md)) | — |
 
 ### 채택·기각 판정
 | 항목 | 효과 | 판정 |
