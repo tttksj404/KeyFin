@@ -34,4 +34,4 @@ GPU 입력에는 선택에 필요한 ID·제목·승인 본문을 넣고, URL·�
 
 검색·선택·출처·질문 답변 검증은 금융 개념을 정확한 자료에 연결하는지의 검사입니다. 소비 예측 오차와는 다른 지표입니다. 새 합성 질문으로 지원 범위가 넓어진 것을 확인하더라도 전체 사용자 질문의 정답률로 일반화하지 않습니다. 최신 금리, 개인별 상품 추천, 등록되지 않은 법규·세금·복잡한 계산은 자료 보완이 필요합니다.
 
-검증 코드는 `tests/test_knowledge_retrieval.py`, `tests/test_finance_questions.py`입니다. 실제 GPU 질문별 결과·지연·거절 상태는 [R20 답변 검증](answer-quality-latency-r20.md)에서 별도로 집계합니다.
+검증 코드는 `tests/test_knowledge_retrieval.py`, `tests/test_finance_questions.py`입니다. 실제 GPU 질문별 결과·지연·거절 상태는 R20 답변 검증에서 별도로 집계합니다.

@@ -56,7 +56,7 @@ flowchart TB
 
 `CoachingCore`가 FDT 어댑터·모델 클라이언트·저장소를 연결하고, 요청 종류에 따라 `Events`, `Dialogue`, `Charts`가 호출 순서를 정합니다. FDT는 API 프로세스 안에서 스레드 실행 제한을 두고 호출하는 Python 코드입니다. 별도 FDT HTTP 서버를 호출하는 구성이 아닙니다.
 
-대화의 `numeric_result`는 `numeric_rendering.py`에서 원본 Twin과 요청 기간에 일치하는지 검사한 뒤 본문에 들어갑니다. 금액·확률을 LLM이 재작성하지 않습니다. R12에서 수정한 수치 누락과 실제 응답 비교는 [답변·예측 개선 결과](answer-forecast-improvement.md)에 있습니다.
+대화의 `numeric_result`는 `numeric_rendering.py`에서 원본 Twin과 요청 기간에 일치하는지 검사한 뒤 본문에 들어갑니다. 금액·확률을 LLM이 재작성하지 않습니다. R12에서 수정한 수치 누락과 실제 응답 비교는 답변·예측 개선 결과에 있습니다.
 
 알림은 SQLite의 outbox에 저장한 뒤 조회·ack API로 전달 여부를 관리합니다. 실제 푸시 발송, 금융기관 데이터 자동 동기화, 자동 재시작 운영은 별도 연결이 필요합니다. 엔진이나 LLM이 실제 이체·결제를 실행하지 않습니다.
 
@@ -80,9 +80,9 @@ flowchart LR
     Delivery -->|"전송 성공 후 ack"| Notice
 ```
 
-Python API는 외부 원천 DB를 직접 조회하지 않으며 Spring·JDBC·JPA 원천 어댑터나 외부 재시도 worker를 포함하지 않습니다. 외부 호출 계층이 권위 있는 소유자와 원천 데이터를 확정해 API 스키마로 변환해야 합니다. AI API가 보유한 outbox는 코칭 알림의 조회·ack 저장소이며 실제 푸시 전송은 수행하지 않습니다. 이전 R15의 외부 원천 동기화 실험은 [과거 검증 보고서](coaching-completion-r15.md)에 현재 MR 제외 범위를 명시해 보존합니다.
+Python API는 외부 원천 DB를 직접 조회하지 않으며 Spring·JDBC·JPA 원천 어댑터나 외부 재시도 worker를 포함하지 않습니다. 외부 호출 계층이 권위 있는 소유자와 원천 데이터를 확정해 API 스키마로 변환해야 합니다. AI API가 보유한 outbox는 코칭 알림의 조회·ack 저장소이며 실제 푸시 전송은 수행하지 않습니다. 이전 R15의 외부 원천 동기화 실험은 과거 검증 보고서에 현재 MR 제외 범위를 명시해 보존합니다.
 
-[R15 GPU 연구](aggregate-forecast-r15.md)의 추가학습 모델은 위 제품 실행 경로와 별도의 후보입니다. 과거 체코 총출금 개선을 한국 7봉투 FDT 교체나 실고객 검증 완료로 연결하지 않습니다.
+R15 GPU 연구의 추가학습 모델은 위 제품 실행 경로와 별도의 후보입니다. 과거 체코 총출금 개선을 한국 7봉투 FDT 교체나 실고객 검증 완료로 연결하지 않습니다.
 
 ## FDT 안에서 예측과 코칭을 계산하는 방법
 
