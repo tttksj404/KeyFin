@@ -40,6 +40,23 @@ def _put_quantiles(result: dict, prefix: str, values: np.ndarray | None, basis='
         result['metrics'][prefix+'_'+k+'_krw']=metric(v,basis=basis)
 
 
+def _account_shortfall(sim: Simulation, snapshot: dict | None) -> list[dict]:
+    """Per-account share of paths whose balance goes below zero in the horizon.
+
+    The aggregate p_any_account_shortfall cannot say which account runs short, so a
+    user with ample total cash only saw a bare alarming percentage. Each simulated
+    account is listed with its reported opening balance and income flag.
+    """
+    if sim.cash is None:
+        return []
+    reported = {a['account_id']: a for a in (snapshot or {}).get('accounts', [])}
+    return [{'account_id': aid,
+             'balance_krw': reported.get(aid, {}).get('balance_krw'),
+             'is_income': reported.get(aid, {}).get('is_income') is True,
+             'p_shortfall': probability(np.any(sim.cash[:, :, k] < 0, axis=1))}
+            for k, aid in enumerate(sim.account_ids)]
+
+
 def _goal_values(sim: Simulation, target: int, reserve: int) -> tuple[np.ndarray,np.ndarray,np.ndarray]:
     available=sim.free[:,-1]-reserve
     reached=available>=target
@@ -160,6 +177,7 @@ class Engine:
                                           for j,env in enumerate(ENVELOPES)]
         result['datasets']['fixed_groups']=[{'group':group,**{k+'_krw':v for k,v in quantiles(sim.fixed_by_group[:,:,j].sum(axis=1)).items()}}
                                            for j,group in enumerate(FIXED_GROUPS)]
+        result['datasets']['account_shortfall']=_account_shortfall(sim,self.twin.snapshot)
         prefix='cash_balance' if not missing else 'resource_change'
         result['visualizations'].append(visual('projection','band_line','예측 자금 경로' if not missing else '구매시점 자금 여력 변화 (현금 잔액 아님)',
             'projection','date',[prefix+'_p50_krw'],lower=prefix+'_p10_krw',upper=prefix+'_p90_krw'))
@@ -179,6 +197,7 @@ class Engine:
         result['metrics']['branch_p_any_account_shortfall']=metric(probability(branch.any_account_short) if branch.any_account_short is not None else None,'probability')
         result['datasets']['branch_fixed_groups']=[{'group':group,**{k+'_krw':v for k,v in quantiles(branch.fixed_by_group[:,:,j].sum(axis=1)).items()}}
                                                   for j,group in enumerate(FIXED_GROUPS)]
+        result['datasets']['branch_account_shortfall']=_account_shortfall(branch,self.twin.snapshot)
         prefix='cash_balance' if branch.cash_total is not None else 'resource_change'
         rows=[]
         for a,b in zip(result['datasets']['projection'],result['datasets']['branch_projection']):

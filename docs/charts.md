@@ -37,6 +37,8 @@ sequenceDiagram
 | `GET /v1/charts/{id}` | 같은 소유자의 user 또는 backend 토큰. 저장한 JSON 반환 |
 | `GET /v1/charts/{id}/html` | 같은 소유자만 독립 HTML 조회. 다른 사용자에게는 404 |
 
+예측·구매 검토 대화(`Coaching`)는 이 엔드포인트로 보낼 본문을 `chart_hint`로 미리 알려줄 수 있습니다. `chart_hint.period_start`(대화 기준일이 속한 예산 월의 1일)와 `question`을 그대로 사용하면 같은 예산 월의 차트를 얻습니다. 대화와 차트 엔드포인트는 분리되어 있어(옵션 b), 서버는 대화에서 두 번째 시뮬레이션을 돌리지 않습니다. 자세한 대화 계약은 [대화 API](chat.md)를 참고합니다.
+
 `data`는 기존 [`Bootstrap`](../src/coaching_service/schemas.py)의 `as_of`, `transactions`, `snapshot`, `envelopes` 구조입니다. 인라인 `data`를 보내면 해당 요청의 원장으로 계산하고, 저장된 Twin 원장을 덮어쓰지 않습니다. `data`를 생략하면 `POST /v1/twin`으로 저장해 둔 인증 사용자 원장을 사용합니다. 사용자 ID를 본문에 바꾸어 넣어 다른 사람의 원장으로 실행할 수 없습니다.
 
 서비스 디렉터리에서 [시작 안내](../README.md)의 개인 테스트 토큰을 유지한 상태로 호출합니다. 아래 예시는 기존 합성 입력을 재사용하며 실제 고객 자료가 아닙니다.
@@ -65,6 +67,22 @@ Invoke-WebRequest -Uri "http://127.0.0.1:8000/v1/charts/$($taskChart.id)/html" `
 
 같은 사용자·키·입력으로 재시도하면 같은 저장 결과를 돌려주며 모델을 다시 호출하지 않습니다. 입력이 달라졌으면 새 키를 사용합니다. 모델 연결에는 기존 [운영 설정](operations.md)의 `COACHING_MODEL` JSON에 주소·토큰·모델 이름을 지정합니다. HTML에 인증 토큰을 넣지 않으며, `/html`도 인증 없이 공개되지 않습니다.
 
+## 구매 what-if 모드
+
+요청에 `purchase` 블록(`envelope`·`amount_krw`·`on_date`)을 넣으면 예정 구매 한 건을 반영한 **구매 전/후 누적 소비선**을 함께 받습니다. `envelope`은 7개 카테고리 중 하나, `amount_krw`는 양수, `on_date`는 기준일 다음 날부터 예산 종료일까지의 미래 날짜여야 합니다. 그 밖은 422(`chart_purchase_out_of_period`·`chart_purchase_envelope_unknown`·`chart_purchase_period_closed`)로 거부합니다.
+
+```json
+{ "period_start": "2026-09-01", "purchase": { "envelope": "외식", "amount_krw": 50000, "on_date": "2026-09-20" } }
+```
+
+두 번째 시뮬레이션을 돌리지 않습니다. 팀 FDT의 페어드 CRN 예측은 모든 경로에 같은 난수 묶음을 쓰고 구매일에 고정 금액 A만 더하므로, P50도 정확히 A만큼 이동합니다. 따라서 결정적으로 겹쳐 그립니다.
+
+`planned_cum_p50(t) = baseline_cum_p50(t) + (A if t ≥ on_date else 0)`, `terminal_planned = terminal_baseline + A`.
+
+응답의 `balance.forecast`는 **구매 후 예측선(기본 선)**, 새 `balance.baseline`은 **구매 전 기준 예측선(연한 선)**입니다. `totalForecast`·`terminal`·구매 봉투의 `categories[].forecast`는 구매 후 값이며 `meta.purchase`에 적용한 구매, `meta.purchase_note`에 관점 주의 문구를 담습니다. 렌더러(`keyfin-flow.js`)는 이미 `baseline` 배열을 연한 점선으로 그리므로 렌더러·`CHART_MANIFEST.json` 변경은 없습니다. `purchase`가 없으면 `balance.baseline`은 비어 있어 기존 예측 요청과 완전히 동일합니다.
+
+**의미 렌즈 주의**: 이 선은 **예산·소비 관점**입니다. 계획 구매를 변동소비 누적선에 더한 값이며 **계좌 잔액이나 결제 가능 여부(현금 관점)를 보장하지 않습니다.** 카드 결제 시점 등 현금 흐름은 이 곡선에 영향을 주지 않으므로, 부족액 판정이 필요하면 구매 검토(review)의 현금 부족액 문장을 따로 확인해야 합니다.
+
 ## 프런트엔드 계약
 
 응답의 `chart`를 원래 `KeyFinChart.mount(container, chart, options)`에 전달합니다. 누적선과 일별 구성은 각각 `KeyFinFlow.svg(chart, style)`, `KeyFinFlow.dailySvg(chart)`로 그립니다. JSON은 [`chart_contract.py`](../src/coaching_service/chart_contract.py), 렌더러 타입은 [`keyfin-chart.d.ts`](../vendor/keyfin_chart/keyfin-chart.d.ts)가 기준입니다.
@@ -74,6 +92,7 @@ Invoke-WebRequest -Uri "http://127.0.0.1:8000/v1/charts/$($taskChart.id)/html" `
 | `chart.categories` | 원래 순서의 7개 카테고리, 예산·현재 소비·기간 말 총소비 |
 | `chart.totalCurrent`, `chart.totalForecast` | 기간 내 현재까지 총소비와 기간 종료 시점의 전체 P50 |
 | `chart.balance` | `kind=cumulative_expense`. 실제 누적 기록과 미래 누적 P50 경로 |
+| `chart.balance.baseline` | 구매 what-if의 구매 전 기준 예측선(연한 점선). 구매 요청이 아니면 빈 배열이라 렌더러가 그리지 않음 |
 | `chart.balance.daily` | 입력 관측 시작일부터 종료일까지 날짜별 7개 금액. 기준일까지 입력 관측값, 이후 같은 시뮬레이션의 경로 평균. 첫 입력 이전 날짜는 미관측으로 제외 |
 | `chart.answer`, `wording` | 검증된 AI 설명 또는 대체 안내와 출처·사유 |
 | `receipt` | FDT·렌더러 커밋, 원장 식별자·버전·해시, 수치 요청과 원본 계산 결과 |

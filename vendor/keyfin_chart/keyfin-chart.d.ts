@@ -57,8 +57,10 @@ export interface Options {
   style?: Record<string, number>;
   currentOnly?: boolean;
   labelMode?: 'current' | 'forecast';
-  /** reference: 0–100% visual cap; linear: shared scale including all finite ratios. */
+  /** reference: 0–100% visual cap; linear: shared scale including all finite ratios, up to maxScale. */
   scale?: 'reference' | 'linear';
+  /** linear 축의 최대 비율(1 = 100%). 기본 1.2(120%). 넘는 막대는 잘리고 수치는 원래 값으로 표시한다. */
+  maxScale?: number;
   onSelect?: (row: Envelope) => void;
 }
 export interface Controller {

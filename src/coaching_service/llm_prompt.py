@@ -272,7 +272,8 @@ def wording_problem(raw: str) -> str | None:
         return "invalid_wording"
     if any(char.isnumeric() for char in raw) or _QUANTITY.search(text) or re.search(r"[%₩$€£]", text):
         return "numeric_output"
-    if re.search(r"[\"'“”\u2018\u2019«»「」『』`<>]", text):
+    # "*" joins the banned symbols: bold marks come only from the server renderer.
+    if re.search(r"[\"'“”\u2018\u2019«»「」『』`<>*]", text):
         return "unsupported_quote"
     checks = (
         (_CLAIM, text, "unsupported_claim"),

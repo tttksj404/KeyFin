@@ -203,7 +203,7 @@ async def run(output: Path, *, rounds: int, conditions: Sequence[int]) -> dict[s
         for index, token in enumerate(tokens)
     )
     with tempfile.TemporaryDirectory(prefix="keyfin-r49-fdt-latency-") as directory:
-        settings = Settings(database=Path(directory) / "coaching.sqlite3", clients=clients)
+        settings = Settings(database=Path(directory) / "coaching.sqlite3", clients=clients, persona="plain")
         app = create_app(settings, ModelMustNotRun())
         async with serve(app) as base, httpx2.AsyncClient(trust_env=False, timeout=30) as client:
             for index, token in enumerate(tokens):

@@ -7,10 +7,10 @@ from collections import OrderedDict
 from concurrent.futures import Future
 from hashlib import sha256
 from threading import RLock
-from typing import TYPE_CHECKING, final
+from typing import TYPE_CHECKING, Final, final
 
 from fdt import Engine, Twin
-from fdt.coaching import Coach
+from fdt.coaching import Coach, observed_budgets
 from fdt.ingest import Transaction, normalize
 from fdt.store import apply_events
 from pydantic import JsonValue, ValidationError
@@ -40,6 +40,30 @@ def normalized_transaction(document: JsonDocument) -> Transaction:
     ):
         raise ServiceError("inconsistent_transfer_direction")
     return transaction
+
+
+# ``Coach.review`` 가 시뮬레이션 전에 붙이는 입력 점검 경고. 잔액 확인도 같은 코드·문구를 쓴다.
+_ASSUMED_SNAPSHOT_DETAIL: Final = (
+    "잔액·카드 청구·예산에 사용자 또는 데모 가정이 포함되어 있습니다. 실제 계좌 확인 결과가 아닙니다."
+)
+_BUDGET_INPUT_INCOMPLETE_DETAIL: Final = (
+    "월초 이력 또는 지출 분류가 충분하지 않아 잔여 예산만으로 새 지출을 권하지 않습니다."
+)
+_PENDING_EXPENSE_LIMIT: Final = 0.05
+
+
+def _budget_input_incomplete(twin: Twin) -> bool:
+    """``Coach.review`` 의 ``uncertain_budget`` 판정을 그대로 따른다. 거래가 없으면 불완전으로 본다."""
+    if not twin.transactions or min(row.date for row in twin.transactions) > twin.as_of[:8] + "01":
+        return True
+    audit = twin.model.get("audit")
+    audit = audit if isinstance(audit, dict) else {}
+    totals = audit.get("kind_totals_krw")
+    pending = audit.get("pending_consumption_krw", 0)
+    expense = totals.get("expense", 0) if isinstance(totals, dict) else 0
+    if not isinstance(pending, (int, float)) or not isinstance(expense, (int, float)):
+        return True
+    return expense > 0 and pending / expense > _PENDING_EXPENSE_LIMIT
 
 
 @final
@@ -265,6 +289,63 @@ class EngineAdapter:
 
     def review(self, document: JsonDocument, request: JsonDocument) -> JsonDocument:
         return self._cached_review(self._twin(document), request)
+
+    def balance(self, document: JsonDocument, request: JsonDocument) -> JsonDocument:
+        """현재 봉투 잔액 확인을 미래 경로 없이 장부 사실만으로 답한다.
+
+        ``Coach.review`` 는 항상 몬테카를로 예측을 돌리고 ``next_action``·경고 대부분을
+        그 미래 경로에서 만든다. "지금 얼마 남았어"에 그 값을 현재 사실처럼 보이면 안 되므로
+        엔진의 결정형 ``observed_budgets`` 와, 시뮬레이션 전에 붙는 입력 점검 경고
+        (가정 스냅숏·과거 기준 재생·예산 입력 불완전)만 같은 코드·문구로 쓴다.
+        """
+        twin = self._twin(document)
+        snapshot = twin.snapshot or {}
+        on_date = request.root.get("on_date")
+        missing: list[JsonValue] = list(twin.cash_requirements())
+        warnings: list[JsonValue] = []
+        if snapshot.get("source") == "USER_ASSUMPTION":
+            warnings.append(
+                {"code": "ASSUMED_SNAPSHOT", "severity": "user", "detail": _ASSUMED_SNAPSHOT_DETAIL}
+            )
+        if request.root.get("replay"):
+            warnings.append(
+                {
+                    "code": "HISTORICAL_REPLAY",
+                    "severity": "user",
+                    "detail": f"{on_date} 자료 기준의 검토입니다. "
+                    "오늘의 사용 가능 금액으로 안내하지 않습니다.",
+                }
+            )
+        # 기준일이 자료와 다르면 review 도 갱신부터 요구하고 예산 입력 점검까지 가지 않는다.
+        current = on_date == twin.as_of
+        if current and _budget_input_incomplete(twin):
+            warnings.append(
+                {
+                    "code": "BUDGET_INPUT_INCOMPLETE",
+                    "severity": "user",
+                    "detail": _BUDGET_INPUT_INCOMPLETE_DETAIL,
+                }
+            )
+        return JsonDocument.model_validate(
+            {
+                "operation": "balance_check",
+                "twin_id": twin.twin_id,
+                "revision": twin.revision,
+                "input_digest": twin.content_digest,
+                "as_of": twin.as_of,
+                "on_date": on_date,
+                # review 와 같은 판정: 스냅숏이 낡았거나(dirty·기준일 불일치) 계좌·카드 자료가
+                # 빠지면 needs_data 이고, 이때 봉투 구간 조언(근접·여유)은 켜지지 않는다.
+                "status": "ready" if current and not missing else "needs_data",
+                "missing_cash_inputs": missing,
+                "observed_budgets": observed_budgets(twin),
+                "projection": None,
+                "comparison": None,
+                "next_action": None,
+                "warnings": warnings,
+                "executed": False,
+            }
+        )
 
     def numeric(self, document: JsonDocument, request: JsonDocument) -> JsonDocument:
         try:

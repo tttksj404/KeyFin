@@ -133,13 +133,32 @@ def test_datetime_is_not_silently_converted_to_local_calendar_date() -> None:
     [
         ("앞으로 30일 예측해줘", 30), ("30일 뒤 잔액", 30), ("기준일부터 30일 예측", 29),
         ("기준일 포함 30일 예측", 29), ("이번 달 예산", 20), ("2026-10-10까지 예측", 30),
-        ("이전 코칭을 설명해줘", 7),
+        # A period-less question follows the budget cycle (same as "이번 달"), so the
+        # answer's period matches the chart, which always draws the budget month.
+        ("이전 코칭을 설명해줘", 20),
         ("30일 뒤 잔액이 10만원 이상일지 예측", 30),
         ("30일 뒤 전망해줘", 30), ("이번 달 초과 위험", 20),
     ],
 )
 def test_question_period_is_grounded_before_model_call(question: str, days: int) -> None:
     assert turn_period(date(2026, 9, 10), question, None, None).forecast_days == days
+
+
+def test_period_less_default_follows_budget_cycle_and_its_start_day() -> None:
+    # "예산 위험해?" names no period: it covers the rest of the budget cycle.
+    resolved = turn_period(date(2026, 9, 22), "예산 위험해?", None, None)
+    assert (resolved.source, resolved.kind) == ("default", "month_end")
+    assert (resolved.forecast_start, resolved.forecast_end) == (date(2026, 9, 23), date(2026, 9, 30))
+    # A custom budget start day moves the cycle end with it (cycle 9/15 to 10/14).
+    custom = turn_period(date(2026, 9, 22), "예산 위험해?", None, None, budget_start_day=15)
+    assert custom.forecast_end == date(2026, 10, 14)
+
+
+def test_period_less_default_on_cycle_last_day_keeps_seven_days() -> None:
+    # On the cycle's last day the budget month has no future day (422), so the
+    # period-less default falls back to the 7-day rolling window instead.
+    resolved = turn_period(date(2026, 9, 30), "예산 위험해?", None, None)
+    assert (resolved.source, resolved.kind, resolved.forecast_days) == ("default", "rolling_days", 7)
 
 
 def test_question_period_distinguishes_current_and_next_calendar_months() -> None:

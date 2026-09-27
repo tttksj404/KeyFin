@@ -28,7 +28,7 @@ async def dialogue(flow: ScenarioIO, original: Coaching) -> Coaching:
         mode = observe_routing(flow, receipt, deterministic_route=deterministic_route)
         flow.check(
             "dialogue_current_historical_separation",
-            receipt.trigger in {"numeric_dialogue", "requested_review"}
+            receipt.trigger in {"numeric_dialogue", "requested_review", "balance_check"}
             and receipt.payment is None
             and receipt.original_coaching_id == original.id
             and receipt.historical is not None

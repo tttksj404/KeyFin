@@ -497,7 +497,12 @@ class Twin:
                 missing.append('snapshot.accounts/' + flow_value['account_id'])
             elif not flow_value['account_id']:
                 missing.append('flow.account_id')
-            if flow_value['kind'] == 'internal_transfer' and flow_value['to_account_id'] not in accounts:
+            if (flow_value['kind'] == 'internal_transfer' and flow_value['to_account_id'] is not None
+                    and flow_value['to_account_id'] not in accounts):
+                # A destination that is named but unknown is a real inconsistency and still
+                # blocks the absolute path. A transfer with no destination at all (to_account_id
+                # is None) is net-zero on total cash, so it is handled as a no-op in simulate()
+                # and must not block the absolute cash/net-worth forecast.
                 missing.append('internal_transfer.to_account_id')
         return sorted(set(missing))
 

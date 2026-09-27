@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # the controlled external-dummy screen; higher values stay configurable for a
     # deployment that has its own trace evidence.
     fdt_max_concurrency: Annotated[int, Field(ge=1, le=8)] = 2
+    # 사용자에게 보이는 문장의 말투. KeyFin 코치는 고양이라 기본은 "cat"(~다냥)이고,
+    # "plain"은 저장된 중립 문장을 그대로(굵게 표시만 제거) 내보낸다.
+    persona: Literal["cat", "plain"] = "cat"
 
     @model_validator(mode="after")
     def unique_tokens(self) -> Self:

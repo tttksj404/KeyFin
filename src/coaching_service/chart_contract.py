@@ -16,12 +16,26 @@ from coaching_service.schemas import Bootstrap, Frozen, JsonDocument, TwinIdenti
 ChartMoney = Annotated[int, Field(strict=True, ge=-9007199254740991, le=9007199254740991)]
 
 
+class PurchaseChange(Frozen):
+    """예정 구매 한 건. 차트는 봉투·금액·날짜만 쓰며 현금 흐름은 다루지 않는다.
+
+    계좌·카드는 담지 않는다. 이 렌즈는 예산·소비 관점이라 현금 인출 시점이 아니라
+    변동소비 누적선에 고정 지출을 더할 뿐이다. 금액은 양수 고정 지출이다.
+    """
+
+    envelope: str = Field(min_length=1, max_length=40)
+    amount_krw: Annotated[ChartMoney, Field(ge=1)]
+    on_date: DateOnly
+
+
 class ChartRequest(Frozen):
     data: Bootstrap | None = None
     period_start: DateOnly
     question: str = Field(default="예산 기간의 예상 소비를 보여 주세요.", min_length=1, max_length=2000)
     paths: int = Field(default=400, ge=20, le=400)
     seed: int = Field(default=42, ge=0, le=4294967295)
+    # None이면 기존 예측 요청과 동일하다. 설정하면 구매 전/후 누적선을 겹쳐 그린다.
+    purchase: PurchaseChange | None = None
 
 
 class BudgetPeriod(Frozen):
@@ -90,6 +104,8 @@ class Balance(Frozen):
     terminal: Quantile
     history: tuple[HistoricalPoint, ...]
     forecast: tuple[ForecastPoint, ...]
+    # 구매 전 기준 예측선(연한 선). 구매 what-if가 아니면 비어 있어 렌더러가 그리지 않는다.
+    baseline: tuple[ForecastPoint, ...] = ()
     daily: tuple[DailyPoint, ...]
 
 
@@ -109,7 +125,8 @@ class ChartMeta(BudgetPeriod):
     daily_note: str = "분류된 변동소비의 관측 기록입니다. 미분류 소비와 미래 일별 구성은 제공하지 않습니다."
     daily_forecast_statistic: Literal["empirical_path_mean"] | None = None
     aggregation_note: str = (
-        "고정비 제외·미분류 포함 구매시점 변동소비입니다. 전체 P50은 봉투별 P50의 합이 아닙니다. "
+        "고정비는 빼고 미분류 소비는 넣은, 결제한 날 기준 변동소비입니다. "
+        "전체 예상 금액은 항목별 예상 금액을 더한 값과 다를 수 있습니다. "
         "거래가 없는 날은 입력 자료 안에서 0으로 처리하며, 거래 누락 여부는 확인되지 않았습니다."
     )
     calibrated: Literal[False] = False
@@ -118,6 +135,9 @@ class ChartMeta(BudgetPeriod):
     status: str
     quality: ChartQuality | None = None
     observation_start: date | None = None
+    # 구매 what-if로 적용한 예정 구매와 예산·소비 렌즈 주의 문구. 아니면 None이다.
+    purchase: PurchaseChange | None = None
+    purchase_note: str | None = None
 
 
 class ChartResult(Frozen):

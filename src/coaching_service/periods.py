@@ -88,16 +88,42 @@ class ResolvedPeriod(PeriodContract):
     lunar_calendar_supported: Literal[False] = False
 
 
-def resolve_period(reference: date, spec: PeriodSpec, source: PeriodSource) -> ResolvedPeriod:
+def budget_cycle(reference: date, budget_start_day: int = 1) -> tuple[date, date]:
+    """설정한 예산 시작일 기준으로 기준일이 속한 주기의 시작·종료일을 계산한다.
+
+    주기 시작일은 기준일 당일 또는 그 이전의 가장 최근 해당 일자이고, 종료일은 다음
+    주기 시작 전날이다. ``budget_start_day=1`` 이면 기준월 1일~말일과 정확히 같아
+    기존 동작을 그대로 유지한다. 시작일은 1~28만 허용하므로 모든 달에 존재해 말일
+    없는 달(2월 등) 보정이 필요 없다. 기준일이 바뀌면 주기도 함께 이동한다.
+    """
+    start_day = min(max(budget_start_day, 1), 28)
+    anchor = reference.replace(day=start_day)
+    if anchor <= reference:
+        start = anchor
+    elif reference.month == 1:
+        start = date(reference.year - 1, 12, start_day)
+    else:
+        start = date(reference.year, reference.month - 1, start_day)
+    following = (
+        date(start.year + 1, 1, start_day)
+        if start.month == 12
+        else date(start.year, start.month + 1, start_day)
+    )
+    return start, following - timedelta(days=1)
+
+
+def resolve_period(
+    reference: date, spec: PeriodSpec, source: PeriodSource, budget_start_day: int = 1
+) -> ResolvedPeriod:
     """기준일은 관측 마감값이며 시뮬레이션은 다음 날부터 종료일 포함이다.
 
     요청 구간에 기준일을 포함해도 그 날을 다시 예측하지 않는다. 미래 0일·과거·
     90일 초과·날짜 범위 초과는 422로 거부하고, 윤년은 양력 달력으로 계산한다.
+    예산 주기는 ``budget_start_day`` (없으면 1일)로 정하며 기준일 이동을 따라간다.
     """
-    month_start = reference.replace(day=1)
-    month_end = reference.replace(day=calendar.monthrange(reference.year, reference.month)[1])
     try:
         tomorrow = reference + timedelta(days=1)
+        month_start, month_end = budget_cycle(reference, budget_start_day)
         match spec:
             case RollingDays():
                 window_start = reference if spec.include_reference_date else tomorrow

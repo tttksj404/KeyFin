@@ -16,6 +16,8 @@ from coaching_service.schemas import Frozen, JsonDocument, Money
 class Account(Frozen):
     account_id: str
     balance_krw: Money
+    # 엔진 snapshot.json 과 같은 선택 필드(주거래 여부). 모르는 필드는 계속 거부한다.
+    is_income: bool = False
 
 
 class Asset(Frozen):

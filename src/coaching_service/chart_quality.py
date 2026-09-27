@@ -98,8 +98,9 @@ def chart_quality(
         )
     if pending_forecast:
         notice = (
-            f"미래 미분류 소비만의 P50은 {pending_forecast:,}원이며 항목별 막대에서 제외됩니다. "
-            "이 값은 전체 P50과 카테고리 P50 합의 차이로 계산한 값이 아닙니다."
+            f"앞으로 생길 미분류 소비는 보통 {pending_forecast:,}원으로 예상되며 "
+            "항목별 막대에는 넣지 않았습니다. "
+            "이 값은 전체 예상 금액과 항목별 예상 금액 합의 차이로 계산한 값이 아닙니다."
         )
         notices.append(notice)
         summary.append("미래에도 미분류 소비가 포함됩니다.")

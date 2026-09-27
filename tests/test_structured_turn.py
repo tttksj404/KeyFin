@@ -78,7 +78,7 @@ async def test_explicit_intent_without_twin_is_needs_data_without_router(tmp_pat
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("mode", ["forecast", "risk"])
-async def test_explicit_period_conflict_still_rejects_before_generation(tmp_path: Path, mode: str) -> None:
+async def test_explicit_period_conflict_clarifies_before_generation(tmp_path: Path, mode: str) -> None:
     model = RouteMustNotRun()
     async with httpx2.AsyncClient(
         transport=httpx2.ASGITransport(app=setup(tmp_path / "conflict.sqlite3", model)),
@@ -92,7 +92,11 @@ async def test_explicit_period_conflict_still_rejects_before_generation(tmp_path
             path + "/messages", headers={"Idempotency-Key": "turn"},
             json={"question": "30일 뒤 예측", "analysis": {"mode": mode, "horizon_days": 7}},
         )
-        assert result.status_code == 422
-        assert result.json()["error"] == "period_conflict"
-        assert (await client.get(path)).json() == session
+        # A conflicting question/analysis period no longer 4xx-fails into a 503; it returns
+        # a 200 needs_clarification turn asking for a single period, before any generation.
+        assert result.status_code == 200, result.text
+        answer = result.json()
+        assert answer["answer_type"] == "period_review"
+        assert answer["status"] == "needs_clarification"
+        assert answer["fallback_reason"] == "period_conflict"
         assert model.writes == 0

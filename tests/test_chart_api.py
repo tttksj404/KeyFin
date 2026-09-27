@@ -83,6 +83,9 @@ def test_chart_contains_every_future_day_and_preserves_observed_consumption(tmp_
         assert sum(sum(row["amounts_krw"]) for row in future) > 0
         assert sum(sum(row["amounts_krw"]) for row in daily if row not in future) == 10000
         assert chart["meta"]["daily_forecast_statistic"] == "empirical_path_mean"
+        # The app shows these notes as-is, so statistics jargon must not appear in them.
+        notes = chart["meta"]["daily_note"] + chart["meta"]["aggregation_note"]
+        assert not any(term in notes for term in ("P50", "경로", "FDT"))
         assert result["receipt"]["daily_forecast"]["points"] == future
 
 
@@ -190,6 +193,71 @@ def test_inline_chart_preserves_saved_twin_and_omitted_data_uses_it(tmp_path: Pa
         assert saved.status_code == 200, saved.text
         assert saved.json()["chart"]["totalCurrent"] == 0
         assert saved.json()["receipt"]["identity"]["input_digest"] == created.json()["input_digest"]
+
+
+def _purchase_body(on_date: str = "2026-09-20", amount: int = 5000) -> dict:
+    return {
+        **chart_request(),
+        "purchase": {"envelope": "외식", "amount_krw": amount, "on_date": on_date},
+    }
+
+
+def test_purchase_what_if_overlays_baseline_and_shifts_planned(tmp_path: Path) -> None:
+    # Given the same input charted plainly and with a planned future purchase.
+    model = TestModel()
+    with TestClient(setup(tmp_path / "purchase.sqlite", model)) as client:
+        plain = client.post("/v1/charts/budget-forecast", json=chart_request(), headers=headers("plain"))
+        planned = client.post("/v1/charts/budget-forecast", json=_purchase_body(), headers=headers("plan"))
+        assert plain.status_code == 200, plain.text
+        assert planned.status_code == 200, planned.text
+        plain_chart = plain.json()["chart"]
+        chart = planned.json()["chart"]
+        # Then the response carries both the muted baseline and the primary planned curve.
+        assert chart["balance"]["baseline"], "planned chart must include the pre-purchase baseline"
+        assert chart["balance"]["forecast"][-1]["p50_krw"] == chart["totalForecast"]
+        # The baseline equals the plain forecast (deterministic overlay, no second simulation).
+        assert chart["balance"]["baseline"] == plain_chart["balance"]["forecast"]
+        assert chart["balance"]["baseline"][-1]["p50_krw"] == plain_chart["totalForecast"]
+        # The planned terminal shifts by exactly the purchase amount and the envelope bumps by it.
+        assert chart["totalForecast"] == plain_chart["totalForecast"] + 5000
+        outer = next(row for row in chart["categories"] if row["id"] == "외식")
+        plain_outer = next(row for row in plain_chart["categories"] if row["id"] == "외식")
+        assert outer["forecast"] == plain_outer["forecast"] + 5000
+        # The expense-lens caveat and applied purchase ride on meta.
+        assert chart["meta"]["purchase"]["amount_krw"] == 5000
+        assert "계좌 잔액" in chart["meta"]["purchase_note"]
+        # One forecast simulation per request; the overlay adds none.
+        assert model.writes == 2
+
+
+def test_purchase_what_if_saves_owner_scoped_and_html_shows_baseline(tmp_path: Path) -> None:
+    model = TestModel()
+    with TestClient(setup(tmp_path / "purchase.sqlite", model)) as client:
+        first = client.post("/v1/charts/budget-forecast", json=_purchase_body(), headers=headers("same"))
+        assert first.status_code == 200, first.text
+        chart_id = first.json()["id"]
+        retry = client.post("/v1/charts/budget-forecast", json=_purchase_body(), headers=headers("same"))
+        html = client.get(f"/v1/charts/{chart_id}/html", headers=headers("read"))
+        other = client.get(f"/v1/charts/{chart_id}", headers=headers("other", OTHER))
+        # One inference serves the retry; other owners cannot read it; the baseline series is embedded.
+        assert retry.json() == first.json()
+        assert model.writes == 1
+        assert html.status_code == 200
+        assert '"baseline":[{' in html.text
+        assert other.status_code == 404
+
+
+def test_purchase_outside_future_period_is_rejected(tmp_path: Path) -> None:
+    with TestClient(setup(tmp_path / "purchase.sqlite", TestModel())) as client:
+        same_day = client.post(
+            "/v1/charts/budget-forecast", json=_purchase_body(on_date="2026-09-09"), headers=headers("same")
+        )
+        after = client.post(
+            "/v1/charts/budget-forecast", json=_purchase_body(on_date="2026-10-01"), headers=headers("after")
+        )
+        assert same_day.status_code == 422, same_day.text
+        assert same_day.json()["error"] == "chart_purchase_out_of_period"
+        assert after.status_code == 422, after.text
 
 
 def test_unconfigured_model_returns_honest_template_source(tmp_path: Path) -> None:

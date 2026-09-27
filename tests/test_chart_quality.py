@@ -174,5 +174,6 @@ def test_combined_limits_keep_a_bounded_fallback_and_preserve_future_pending_amo
     assert sum(row["forecast"] for row in data["chart"]["categories"]) == 0
     assert f"{21 * amount:,}원" in " ".join(quality["notices"])
     assert "차이로 계산한 값이 아닙니다" in " ".join(quality["notices"])
+    assert "P50" not in " ".join(quality["notices"])
     assert data["wording"]["source"] == "template"
     assert len(data["wording"]["text"]) <= 400

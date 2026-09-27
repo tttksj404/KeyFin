@@ -228,7 +228,9 @@ def test_one_call_finance_selection_rejects_personal_history_and_forecast_reques
     ("다음 달 잔액이 부족할까?", "risk"),
     ("내 소비 습관을 점검해줘", "review"),
     ("내 지출을 분석해줘", "review"),
-    ("예산 위험 알려줘", None),
+    # 라이브 2026-09-23: 모델이 "예산 위험해?"를 매번 일반 리뷰로 보내 위험 수치가 빠졌다.
+    # 개인 코칭에서 "예산 위험"은 사용자 자신의 예산이므로 결정적 risk 로 보낸다.
+    ("예산 위험 알려줘", "risk"),
     ("이번 달 지출은 얼마야?", None),
     ("다음 달 예산 부족을 막는 방법은 뭐야?", None),
     ("유동성 위험이 뭐야?", None),
@@ -285,6 +287,8 @@ def test_natural_goal_rejects_ambiguous_or_advisory_language(question: str) -> N
 
 @pytest.mark.parametrize(("question", "scenario"), [
     ("이번 달 외식비를 20% 줄이면 어떻게 될까?", {"expense_reductions": {"외식": 0.2}}),
+    # 일상어 "식비"도 엔진 매핑(식비→외식)대로 외식 봉투 절감으로 접힌다.
+    ("이번 달 식비를 20% 줄이면 어떻게 될까?", {"expense_reductions": {"외식": 0.2}}),
     ("다음 달 변동 지출을 10% 줄이면 잔액이 어떻게 달라져?", {"expense_multiplier": 0.9}),
 ])
 def test_natural_what_if_requires_one_explicit_variable_expense_branch(
@@ -512,7 +516,7 @@ async def test_clear_natural_what_if_uses_typed_paired_fdt_without_model_routing
         "scenario": scenario,
     }
     assert answer["receipt"]["numeric_result"]["mode"] == "what_if"
-    assert "가정은" in answer["text"]
+    assert "가정했어요" in answer["text"]
     assert model.routes == 0
     assert model.writes == 0
 

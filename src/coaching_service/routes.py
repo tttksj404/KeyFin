@@ -1,6 +1,6 @@
 """Standalone authenticated financial coaching API."""
 
-from typing import Annotated
+from typing import Annotated, TypeVar
 
 from fastapi import Depends, FastAPI
 
@@ -8,10 +8,12 @@ from coaching_service.auth import Authenticate
 from coaching_service.chat_answers import ChatAnswer, FinanceQuestion
 from coaching_service.coaching import CoachingCore
 from coaching_service.dialogue import Dialogue
+from coaching_service.envelope_review import EnvelopeReview, EnvelopeReviewRequest, evaluate_envelope
 from coaching_service.events import Events
 from coaching_service.http_contracts import RequestKey, operation
+from coaching_service.persona import Persona, present
 from coaching_service.records import Records
-from coaching_service.repository import document
+from coaching_service.repository import Mutation, document
 from coaching_service.schemas import (
     Bootstrap,
     Coaching,
@@ -29,6 +31,28 @@ from coaching_service.schemas import (
     TwinIdentity,
 )
 
+_Answer = TypeVar("_Answer", Coaching, ChatAnswer)
+
+
+def _voiced(answer: _Answer, persona: Persona) -> _Answer:
+    """Apply the user-facing voice to one answer; the stored neutral text is unchanged."""
+    return answer.model_copy(update={"text": present(answer.text, persona)})
+
+
+def _voiced_session(session: Session, persona: Persona) -> Session:
+    messages = tuple(
+        message.model_copy(update={"content": present(message.content, persona)})
+        if message.role == "assistant"
+        else message
+        for message in session.messages
+    )
+    return session.model_copy(update={"messages": messages})
+
+
+def _voiced_notification(notification: Notification, persona: Persona) -> Notification:
+    # A push notification cannot render bold, so its marks are always removed.
+    return notification.model_copy(update={"text": present(notification.text, persona, bold=False)})
+
 
 def register_twin(app: FastAPI, core: CoachingCore, auth: Authenticate) -> None:
     events = Events(core)
@@ -43,14 +67,35 @@ def register_twin(app: FastAPI, core: CoachingCore, auth: Authenticate) -> None:
         body: EventRequest, key: RequestKey, owner: Annotated[str, Depends(auth.backend)]
     ) -> EventResult:
         result = await events.apply(operation(owner, "event", key, document(body)), body)
-        return EventResult.model_validate(result.root)
+        applied = EventResult.model_validate(result.root)
+        if applied.coaching is None:
+            return applied
+        return applied.model_copy(update={"coaching": _voiced(applied.coaching, core.persona)})
 
     async def twin(owner: Annotated[str, Depends(auth.backend)]) -> JsonDocument:
         return await core.twin(owner)
 
+    async def envelope_review(
+        body: EnvelopeReviewRequest, key: RequestKey, owner: Annotated[str, Depends(auth.backend)]
+    ) -> EnvelopeReview:
+        twin_document = await core.twin(owner)
+
+        async def action() -> Mutation:
+            return await evaluate_envelope(core.repository, owner, twin_document, body)
+
+        result = await core.repository.mutate(
+            operation(owner, "envelope-review", key, document(body)), action
+        )
+        review = EnvelopeReview.model_validate(result.root)
+        # Shown in the alert surface, which renders no markdown: voiced, never bold.
+        return review.model_copy(update={"text": present(review.text, core.persona, bold=False)})
+
     app.add_api_route("/v1/twin", bootstrap, methods=["POST"], response_model=TwinIdentity)
     app.add_api_route("/v1/events", event, methods=["POST"], response_model=EventResult)
     app.add_api_route("/v1/twin", twin, methods=["GET"], response_model=JsonDocument)
+    app.add_api_route(
+        "/v1/coaching/envelope-reviews", envelope_review, methods=["POST"], response_model=EnvelopeReview
+    )
 
 
 def register_coaching(app: FastAPI, core: CoachingCore, auth: Authenticate) -> None:
@@ -60,10 +105,11 @@ def register_coaching(app: FastAPI, core: CoachingCore, auth: Authenticate) -> N
         body: ReviewRequest, key: RequestKey, owner: Annotated[str, Depends(auth.user)]
     ) -> Coaching:
         result = await dialogue.review(operation(owner, "review", key, document(body)), body)
-        return Coaching.model_validate(result.root)
+        return _voiced(Coaching.model_validate(result.root), core.persona)
 
     async def coaching(coaching_id: Identifier, owner: Annotated[str, Depends(auth.user)]) -> Coaching:
-        return Coaching.model_validate_json(await core.repository.load(owner, "coaching/" + coaching_id))
+        stored = Coaching.model_validate_json(await core.repository.load(owner, "coaching/" + coaching_id))
+        return _voiced(stored, core.persona)
 
     async def session(
         body: SessionRequest, key: RequestKey, owner: Annotated[str, Depends(auth.user)]
@@ -72,7 +118,8 @@ def register_coaching(app: FastAPI, core: CoachingCore, auth: Authenticate) -> N
         return Session.model_validate(result.root)
 
     async def history(session_id: Identifier, owner: Annotated[str, Depends(auth.user)]) -> Session:
-        return Session.model_validate_json(await core.repository.load(owner, "session/" + session_id))
+        stored = Session.model_validate_json(await core.repository.load(owner, "session/" + session_id))
+        return _voiced_session(stored, core.persona)
 
     async def message(
         session_id: Identifier, body: TurnRequest, key: RequestKey, owner: Annotated[str, Depends(auth.user)]
@@ -80,20 +127,19 @@ def register_coaching(app: FastAPI, core: CoachingCore, auth: Authenticate) -> N
         result = await dialogue.turn(
             operation(owner, "turn/" + session_id, key, document(body)), session_id, body
         )
-        return (
-            ChatAnswer.model_validate(result.root)
-            if "answer_type" in result.root
-            else Coaching.model_validate(result.root)
-        )
+        if "answer_type" in result.root:
+            return _voiced(ChatAnswer.model_validate(result.root), core.persona)
+        return _voiced(Coaching.model_validate(result.root), core.persona)
 
     async def finance(
         body: FinanceQuestion, key: RequestKey, owner: Annotated[str, Depends(auth.user)]
     ) -> ChatAnswer:
         result = await dialogue.finance(operation(owner, "finance", key, document(body)), body)
-        return ChatAnswer.model_validate(result.root)
+        return _voiced(ChatAnswer.model_validate(result.root), core.persona)
 
     async def answer(answer_id: Identifier, owner: Annotated[str, Depends(auth.user)]) -> ChatAnswer:
-        return ChatAnswer.model_validate_json(await core.repository.load(owner, "answer/" + answer_id))
+        stored = ChatAnswer.model_validate_json(await core.repository.load(owner, "answer/" + answer_id))
+        return _voiced(stored, core.persona)
 
     app.add_api_route("/v1/coaching/reviews", review, methods=["POST"], response_model=Coaching)
     app.add_api_route("/v1/coaching/{coaching_id}", coaching, methods=["GET"], response_model=Coaching)
@@ -110,7 +156,10 @@ def register_records(app: FastAPI, core: CoachingCore, auth: Authenticate) -> No
     records = Records(core.repository)
 
     async def pending(owner: Annotated[str, Depends(auth.notification)]) -> NotificationList:
-        return await records.notifications(owner)
+        listed = await records.notifications(owner)
+        return listed.model_copy(
+            update={"items": tuple(_voiced_notification(item, core.persona) for item in listed.items)}
+        )
 
     async def acknowledge(
         event_id: Identifier, key: RequestKey, owner: Annotated[str, Depends(auth.notification)]
@@ -118,7 +167,7 @@ def register_records(app: FastAPI, core: CoachingCore, auth: Authenticate) -> No
         result = await records.acknowledge(
             operation(owner, "ack/" + event_id, key, JsonDocument.model_validate({})), event_id
         )
-        return Notification.model_validate(result.root)
+        return _voiced_notification(Notification.model_validate(result.root), core.persona)
 
     async def erase(owner: Annotated[str, Depends(auth.user)]) -> DeleteResult:
         return await records.erase(owner)

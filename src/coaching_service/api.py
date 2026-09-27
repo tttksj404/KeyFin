@@ -53,6 +53,7 @@ def create_app(settings: Settings, model: LanguageModel | None = None) -> FastAP
         Repository(Store(settings.database)),
         model or OpenAICompatibleCoachModel(settings.model, client=client, gpu_link_submit=gpu_link_submit),
         fdt_max_concurrency=settings.fdt_max_concurrency,
+        persona=settings.persona,
     )
     auth = Authenticate(settings.clients)
     app.add_middleware(BodyLimit)

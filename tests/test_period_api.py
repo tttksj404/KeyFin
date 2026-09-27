@@ -78,19 +78,22 @@ async def test_question_period_reaches_real_engine(
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    ("body", "error"),
+    ("body", "error", "converts"),
     [
-        (JsonDocument({"question": "한 달 뒤 예측"}), "period_clarification_required"),
+        # A resolvable-but-ambiguous or conflicting chat-turn period now clarifies (200);
+        # a genuinely invalid window (no future days / ends before reference) stays 4xx.
+        (JsonDocument({"question": "한 달 뒤 예측"}), "period_clarification_required", True),
         (
             JsonDocument({"question": "30일 뒤 예측", "analysis": {"mode": "forecast", "horizon_days": 7}}),
             "period_conflict",
+            True,
         ),
-        (JsonDocument({"question": "2026-09-09까지 예측"}), "period_has_no_future_days"),
-        (JsonDocument({"question": "2026-09-08까지 예측"}), "period_ends_before_reference"),
+        (JsonDocument({"question": "2026-09-09까지 예측"}), "period_has_no_future_days", False),
+        (JsonDocument({"question": "2026-09-08까지 예측"}), "period_ends_before_reference", False),
     ],
 )
 async def test_invalid_forecast_period_is_rejected_after_intent_before_writer_or_session_mutation(
-    tmp_path: Path, body: JsonDocument, error: str
+    tmp_path: Path, body: JsonDocument, error: str, converts: bool
 ) -> None:
     model = ForecastModel()
     async with httpx2.AsyncClient(
@@ -117,13 +120,22 @@ async def test_invalid_forecast_period_is_rejected_after_intent_before_writer_or
         path = f"/v1/sessions/{session.json()['id']}"
         seen_before = (model.writes, model.routes, model.judgments)
         result = await client.post(path + "/messages", json=body.root, headers={"Idempotency-Key": "invalid"})
-        assert result.status_code == 422
-        assert error in result.text
         # Natural-language requests still route before period parsing; structured forecast
-        # already supplies its intent. Neither path may generate or save an invalid period.
+        # already supplies its intent. Neither path may generate an invalid period.
         assert (model.writes, model.routes, model.judgments) == (
             seen_before[0],
             seen_before[1] + (0 if "analysis" in body.root else 1),
             seen_before[2],
         )
-        assert (await client.get(path)).json() == session.json()
+        if converts:
+            # An ambiguous/conflicting period becomes a saved 200 needs_clarification turn.
+            assert result.status_code == 200, result.text
+            answer = result.json()
+            assert answer["answer_type"] == "period_review"
+            assert answer["status"] == "needs_clarification"
+            assert answer["fallback_reason"] == error
+        else:
+            # A genuinely invalid window keeps its 4xx contract and mutates nothing.
+            assert result.status_code == 422
+            assert error in result.text
+            assert (await client.get(path)).json() == session.json()

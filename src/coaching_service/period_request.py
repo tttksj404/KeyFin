@@ -16,14 +16,17 @@ from coaching_service.periods import (
     ResolvedPeriod,
     RollingDays,
     ThroughDate,
+    budget_cycle,
     resolve_period,
 )
 from coaching_service.schemas import JsonDocument
 
 _PERIOD: Final = re.compile(
     r"(?P<date>\d{4}-\d{2}-\d{2})\s*(?:마감\s*)?까지"
-    r"|(?P<month>이번\s*달(?:\s*말(?:까지|에)?|에)?|이달(?:\s*말(?:까지|에)?|에)?|월말(?:까지|에)?)"
-    r"|(?P<next_month>다음\s*달(?:\s*말(?:까지|에)?|에)?)"
+    # "이번 달까지", "이번 달 안에", "월말 전에", "다음달까지" name the same month end.
+    r"|(?P<month>(?:이번\s*달|이달)(?:\s*말)?(?:\s*(?:까지|에|안에|내에|중에))?"
+    r"|월말(?:\s*전(?:에|까지)?)?(?:\s*(?:까지|에))?)"
+    r"|(?P<next_month>다음\s*달(?:\s*말)?(?:\s*(?:까지|에|안에|내에|중에))?)"
     r"|(?P<inclusive>기준일\s*(?:부터|포함))\s*(?P<included_days>\d{1,3})\s*일"
     r"|(?<![\d./-])(?P<ahead>앞으로\s*)?(?P<days>\d{1,3})\s*일"
     r"(?P<suffix>\s*(?:뒤|후|동안|간))?(?![\d])"
@@ -39,6 +42,15 @@ _MODIFIED: Final = re.compile(
     r"|전(?:[\s,.?!]|$|에|의)|초(?:순|[\s,.?!]|$|에|의)|중(?:순|[\s,.?!]|$|에|의))"
 )
 _UNSUPPORTED_CALENDAR: Final = re.compile(r"윤달|음력|영업일|공휴일")
+# "주말에 뭐하지?" / "오늘 뭐 먹지?" ask what to do, not a period.
+_ACTIVITY_TIME: Final = re.compile(
+    r"(?:주말|오늘|내일|이번\s*주말)\s*(?:에|에는)?\s*뭐\s*(?:하지|할까|해|하니|먹지|먹을까)(?![가-힣])"
+)
+# "다음 주부터 매일 택시 타면 이번 달 적자야?": the start of a habit, not the period asked about.
+_HABIT_START: Final = re.compile(
+    r"(?:오늘|내일|모레|다음\s*주|이번\s*주|주말)\s*부터(?!\s*\d{1,3}\s*일)"
+    r"(?=.{0,20}?(?:타면|시키면|먹으면|가면|쓰면|하면|사면|내면|다니면|마시면))"
+)
 
 
 def question_period(question: str, *, explicit: bool) -> PeriodSpec | None:  # noqa: C901 - 지원 기간 표현이 하나씩 늘며 분기가 누적된 단일 파서; 분해보다 한 곳 유지가 안전하다.
@@ -49,9 +61,13 @@ def question_period(question: str, *, explicit: bool) -> PeriodSpec | None:  # n
     """
     if _UNSUPPORTED_CALENDAR.search(question):
         raise ServiceError("period_unsupported_calendar")
+    question = _ACTIVITY_TIME.sub(" ", _HABIT_START.sub(" ", question))
     matches = list(_PERIOD.finditer(question))
-    if len(matches) > 1:
+    if len(matches) > 1 and not all(match.group("month") for match in matches):
+        # "이번 달 … 월말 잔액" names this month end twice; different periods still conflict.
         raise ServiceError("period_clarification_required")
+    if len(matches) > 1:
+        matches = matches[:1]
     remaining = _PERIOD.sub("", question)
     modified = bool(matches and _MODIFIED.search(question[matches[0].end():]))
     if not explicit and (_UNRESOLVED.search(remaining) or modified):
@@ -75,17 +91,32 @@ def question_period(question: str, *, explicit: bool) -> PeriodSpec | None:  # n
         raise ServiceError("invalid_question_period") from None
 
 
+def _default_spec(reference: date, budget_start_day: int) -> PeriodSpec:
+    """Period-less turns follow the budget cycle; its last day keeps the 7-day default."""
+    _, cycle_end = budget_cycle(reference, budget_start_day)
+    if cycle_end > reference:
+        return MonthEnd()
+    return RollingDays(days=7)
+
+
 def turn_period(
-    reference: date, question: str, explicit: PeriodSpec | None, analysis: JsonDocument | None
+    reference: date,
+    question: str,
+    explicit: PeriodSpec | None,
+    analysis: JsonDocument | None,
+    budget_start_day: int = 1,
 ) -> ResolvedPeriod:
     """명시적 기간→질문→추가 분석 순으로 선택하되 서로 다른 종료일은 거부한다.
 
-    7일은 기간 정보가 전혀 없을 때의 기본 정책이다. 출처를 응답에 남기며,
-    분석 horizon_days까지 같은 미래 구간을 가리켜야 계산을 시작한다.
+    기간 정보가 전혀 없으면 현재 예산 주기(기준일~주기 말)를 기본으로 해, 항상
+    예산 월을 그리는 차트와 답변 기간이 어긋나지 않게 한다. 주기 마지막 날에는 남은
+    미래 일이 없으므로 7일 롤링을 쓴다. 출처를 응답에 남기며, 분석 horizon_days까지
+    같은 미래 구간을 가리켜야 계산을 시작한다. 예산 주기는 ``budget_start_day``
+    (없으면 1일)로 정해 "이번 달" 기간이 설정 시작일을 따른다.
     """
     recognized = question_period(question, explicit=explicit is not None)
     source: PeriodSource = "default"
-    spec: PeriodSpec = RollingDays(days=7)
+    spec: PeriodSpec = _default_spec(reference, budget_start_day)
     if analysis is not None:
         try:
             cost = RequestCost.model_validate(analysis.root)
@@ -96,9 +127,9 @@ def turn_period(
         spec, source = recognized, "question"
     if explicit is not None:
         spec, source = explicit, "request"
-    resolved = resolve_period(reference, spec, source)
+    resolved = resolve_period(reference, spec, source, budget_start_day)
     if explicit is not None and recognized is not None:
-        parsed = resolve_period(reference, recognized, "question")
+        parsed = resolve_period(reference, recognized, "question", budget_start_day)
         if parsed.forecast_end != resolved.forecast_end:
             raise ServiceError("period_conflict")
     if (

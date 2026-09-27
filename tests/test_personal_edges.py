@@ -125,3 +125,21 @@ async def test_personal_update_does_not_write_into_fdt_or_preserve_omitted_secti
     assert result.json()["income"]["coverage"] == "unknown"
     assert question.json()["status"] == "needs_data"
     assert before == after
+
+
+def test_income_flag_on_accounts_is_accepted_but_unknown_fields_are_not() -> None:
+    # Live 2026-09-23: the backend now sends accounts[].is_income (engine snapshot.json
+    # allows it), and this strict model rejected it, so 자산·부채 조회 answered 503.
+    raw = snapshot_input().root["snapshot"]
+    assert isinstance(raw, dict)
+    accounts = raw["accounts"]
+    assert isinstance(accounts, list)
+    flagged = [
+        {**account, "is_income": index == 0}
+        for index, account in enumerate(accounts)
+        if isinstance(account, dict)
+    ]
+    parsed = Snapshot.model_validate(raw | {"accounts": flagged})
+    assert parsed.accounts[0].is_income is True
+    with pytest.raises(ValidationError, match="extra"):
+        Snapshot.model_validate(raw | {"accounts": [{**flagged[0], "bank_name": "국민"}]})

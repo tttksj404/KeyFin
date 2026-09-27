@@ -69,7 +69,9 @@ class RawTransaction(BaseModel):
     category: str
     subcategory: str
     direction: Literal["INCOME", "EXPENSE", "TRANSFER", ""] | None = None
-    exclude_tag: Literal["NONE", "SELF_TRANSFER", "INTERNAL_TRANSFER", "DUTCH", "EMERGENCY", "CARRYOVER"]
+    exclude_tag: Literal[
+        "NONE", "SELF_TRANSFER", "INTERNAL_TRANSFER", "DUTCH", "EMERGENCY", "CARRYOVER", "BUDGET_EXCLUDED"
+    ]
     status: Literal["NORMAL", "CANCELED"]
     confirm_status: Literal["AUTO", "CONFIRMED", "PENDING"]
 
@@ -110,8 +112,8 @@ def raw_rows(twin: JsonDocument, owner: str) -> tuple[RawTransaction, ...]:
 def consumption_amount(row: RawTransaction) -> int | None:
     """Purchase-time variable consumption; None means unresolved consumption.
 
-    Third-party outgoing transfers and DUTCH/EMERGENCY/CARRYOVER purchases are
-    consumption even when excluded from an envelope budget. Card settlement,
+    Third-party outgoing transfers and DUTCH/EMERGENCY/CARRYOVER/BUDGET_EXCLUDED
+    purchases are consumption even when excluded from an envelope budget. Card settlement,
     self-transfer, ATM, loan payment and confirmed fixed bills are not this target.
     """
     direction = row.direction or (

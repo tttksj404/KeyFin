@@ -19,6 +19,7 @@ from coaching_service.personal_contract import (
     PersonalTopic,
 )
 from coaching_service.personal_query import (
+    filtered_personal_topic,
     has_unmatched_fragment,
     select_personal_topic,
     select_personal_topics,
@@ -113,10 +114,23 @@ def _budget_summary(ledger: Ledger) -> PersonalSummary:
     )
 
 
+_KIND_NOTE: Final[dict[str, str]] = {
+    "accounts": "계좌 종류별로 골라 보여 드리지는 못해 연결된 계좌를 모두 보여 드려요.",
+    "debts": "대출 종류별로 골라 보여 드리지는 못해 보고된 대출을 모두 보여 드려요.",
+}
+
+
 async def personal_summary(repository: Repository, owner: str, question: str) -> PersonalSummary:
     topic = select_personal_topic(question)
     if topic is not None:
         return await summary_for_topic(repository, owner, topic)
+    filtered = filtered_personal_topic(question)
+    if filtered is not None:
+        summary = await summary_for_topic(repository, owner, filtered)
+        note = _KIND_NOTE.get(filtered)
+        if note is None:
+            return summary
+        return summary.model_copy(update={"text": note + " " + summary.text})
     topics = select_personal_topics(question)
     if not topics:
         return PersonalSummary(topic=None, status="needs_clarification", text=_UNSUPPORTED_TOPIC_TEXT)

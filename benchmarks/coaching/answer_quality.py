@@ -35,7 +35,7 @@ class AnswerScore(Frozen):
     mode: str
     facts: tuple[FactScore, ...]
     period_delivered: bool
-    conditional_warning_delivered: bool
+    plain_wording: bool
 
     @property
     def complete(self) -> bool:
@@ -43,7 +43,7 @@ class AnswerScore(Frozen):
             bool(self.facts)
             and all(fact.available and fact.delivered for fact in self.facts)
             and self.period_delivered
-            and self.conditional_warning_delivered
+            and self.plain_wording
         )
 
 
@@ -56,11 +56,13 @@ class AnswerQuality(Frozen):
     delivered_facts: int = Field(ge=0)
     interpretation: str = (
         "POST dialogue answers only; GET readbacks are excluded. Checks selected metric amounts "
-        "with related labels, period endpoints, and conditional-model language. The rubric is a "
+        "with related labels, period endpoints, and the absence of quantile or model jargon. The rubric is a "
         "regression for observed omissions, not a blind test, human helpfulness rating, or evidence "
         "that the engine forecast matches future customer outcomes."
     )
 
+
+_JARGON: Final = ("P10", "P50", "P90", "조건부 모")
 
 RULES: Final = {
     "forecast": (
@@ -143,17 +145,15 @@ def score_answer(coaching: Coaching, case_id: str, ordinal: int) -> AnswerScore:
         and period.forecast_start.isoformat() in coaching.text
         and period.forecast_end.isoformat() in coaching.text
     )
-    warning = (
-        any(word in coaching.text for word in ("조건부", "가정 아래", "가정에 따른", "가정 아래의"))
-        and "보장" in coaching.text
-    )
+    # Users read "보통/적게/많이", not quantile labels or a stock model disclaimer.
+    plain = not any(word in coaching.text for word in _JARGON)
     return AnswerScore(
         case_id=case_id,
         ordinal=ordinal,
         mode=mode,
         facts=tuple(facts),
         period_delivered=period_delivered,
-        conditional_warning_delivered=warning,
+        plain_wording=plain,
     )
 
 

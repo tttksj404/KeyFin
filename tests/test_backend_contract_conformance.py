@@ -13,10 +13,12 @@ silently breaks this contract fails CI instead of production.
 
 from __future__ import annotations
 
+import numpy as np
 from fdt import Twin
 from fdt.errors import FDTError
 from fdt.ingest import Transaction, normalize
 from fdt.mapping import ENVELOPES
+from fdt.simulation import generate_bundle, simulate
 
 AS_OF = "2026-09-20"
 DUE_AFTER_AS_OF = "2026-10-05"
@@ -146,6 +148,21 @@ def _rows() -> list[dict[str, object]]:
             account_id=_ACCOUNT_ID,
             card_id="",
         ),
+        # BUDGET_EXCLUDED: a real third-party outflow the user keeps out of budget
+        # envelopes. Stays an expense (counted as spending), amount stored in full,
+        # budget_amount_krw forced to 0 -- NOT an internal_transfer, NOT savings_out.
+        _row(
+            transaction_id="tx-budget-excluded",
+            transaction_type="TRANSFER_OUT",
+            category="사회·경조",
+            subcategory="경조사",
+            merchant="",
+            merchant_id="",
+            amount_krw=70_000,
+            account_id=_ACCOUNT_ID,
+            card_id="",
+            exclude_tag="BUDGET_EXCLUDED",
+        ),
         # TRANSFER + exclude_tag SELF_TRANSFER routes to internal_transfer (not spend).
         _row(
             transaction_id="tx-self-transfer",
@@ -205,6 +222,7 @@ def test_ingest_and_twin_construction_succeed_without_fdt_error() -> None:
     assert twin.transactions
     assert {t.id for t in twin.transactions} == {
         "tx-card-cafe", "tx-mart", "tx-dutch", "tx-deposit", "tx-transfer-out",
+        "tx-budget-excluded",
         "tx-self-transfer", "tx-unmapped", "tx-pending", "tx-overseas",
     }
 
@@ -236,6 +254,18 @@ def test_dutch_expense_keeps_full_amount_but_zeroes_budget() -> None:
     assert tx.amount_krw == 40_000
     assert tx.budget_amount_krw == 0
     assert tx.exclude_tag == "DUTCH"
+
+
+def test_budget_excluded_stays_a_spending_expense_with_zero_budget() -> None:
+    # A budget-excluded third-party outflow is real spending kept out of the budget
+    # envelope: expense kind, full amount, budget 0, and never an internal_transfer.
+    twin = _build_twin()
+    tx = _by_id(twin, "tx-budget-excluded")
+    assert tx.kind == "expense"
+    assert tx.kind != "internal_transfer"
+    assert tx.amount_krw == 70_000
+    assert tx.budget_amount_krw == 0
+    assert tx.exclude_tag == "BUDGET_EXCLUDED"
 
 
 def test_deposit_with_none_exclude_tag_counts_as_income_not_expense() -> None:
@@ -282,3 +312,94 @@ def test_overseas_payment_maps_to_the_real_mapping_module_envelope() -> None:
     tx = _by_id(twin, "tx-overseas")
     assert tx.envelope == "기타"
     assert tx.subcategory == "해외 결제"
+
+
+# --- Regression: unknown-destination internal_transfer must not block/crash the
+# absolute cash path (vendored FDT model.cash_requirements + simulation net-zero).
+
+_INTERNAL_TRANSFER_MISSING = "internal_transfer.to_account_id"
+
+
+def _rows_with_self_transfer_dest(to_account_id: object) -> list[dict[str, object]]:
+    """The full conformance batch, with the SELF_TRANSFER row's ``to_account_id``
+    replaced (``None``/absent, a named-but-unknown id, or the valid account)."""
+    rows: list[dict[str, object]] = []
+    for row in _rows():
+        if row["transaction_id"] != "tx-self-transfer":
+            rows.append(row)
+            continue
+        patched = dict(row)
+        if to_account_id is None:
+            patched.pop("to_account_id", None)
+        else:
+            patched["to_account_id"] = to_account_id
+        rows.append(patched)
+    return rows
+
+
+def _rows_without_self_transfer() -> list[dict[str, object]]:
+    return [row for row in _rows() if row["transaction_id"] != "tx-self-transfer"]
+
+
+def _twin_from_rows(rows: list[dict[str, object]]) -> Twin:
+    return Twin([normalize(row) for row in rows], AS_OF, _snapshot())
+
+
+def test_unknown_destination_self_transfer_does_not_block_absolute_path() -> None:
+    # A SELF_TRANSFER whose destination account is absent (to_account_id=None)
+    # is net-zero on total cash: it must NOT be flagged as missing input, and the
+    # forecast-ready snapshot must still yield an absolute (non-None) managed cash.
+    twin = _twin_from_rows(_rows_with_self_transfer_dest(None))
+    tx = _by_id(twin, "tx-self-transfer")
+    assert tx.kind == "internal_transfer"
+    assert tx.to_account_id is None
+
+    assert _INTERNAL_TRANSFER_MISSING not in twin.cash_requirements()
+
+    state = twin.inspect()["state"]
+    assert state["absolute_cash_ready"] is True
+    assert state["managed_cash_krw"] is not None
+
+    bundle = generate_bundle(twin, 30, 64, 7)
+    sim = simulate(twin, bundle)
+    assert sim.cash_total is not None
+
+
+def test_unknown_destination_self_transfer_is_net_zero_on_total_cash() -> None:
+    # Total cash with the unknown-destination internal_transfer present must equal
+    # the total cash of the identical scenario WITHOUT that transfer (net-zero).
+    twin_with = _twin_from_rows(_rows_with_self_transfer_dest(None))
+    twin_without = _twin_from_rows(_rows_without_self_transfer())
+
+    sim_with = simulate(twin_with, generate_bundle(twin_with, 30, 64, 7))
+    sim_without = simulate(twin_without, generate_bundle(twin_without, 30, 64, 7))
+
+    assert sim_with.cash_total is not None
+    assert sim_without.cash_total is not None
+    # Opening total-cash basis matches, and the full daily total-cash path matches.
+    assert int(sim_with.cash_total[0, 0]) == int(sim_without.cash_total[0, 0])
+    assert np.array_equal(sim_with.cash_total, sim_without.cash_total)
+
+
+def test_named_but_unknown_transfer_destination_still_flags_missing_input() -> None:
+    # Regression pin: a destination that is NAMED but not in snapshot.accounts is a
+    # genuine inconsistency and must still block the absolute path.
+    twin = _twin_from_rows(_rows_with_self_transfer_dest("acc-does-not-exist"))
+    tx = _by_id(twin, "tx-self-transfer")
+    assert tx.kind == "internal_transfer"
+    assert tx.to_account_id == "acc-does-not-exist"
+
+    assert _INTERNAL_TRANSFER_MISSING in twin.cash_requirements()
+    assert twin.inspect()["state"]["absolute_cash_ready"] is False
+
+
+def test_valid_transfer_destination_is_not_flagged_and_simulates() -> None:
+    # Sanity: to_account_id present and in snapshot.accounts -> not flagged, and the
+    # forecast still resolves to an absolute cash path.
+    twin = _twin_from_rows(_rows_with_self_transfer_dest(_ACCOUNT_ID))
+    tx = _by_id(twin, "tx-self-transfer")
+    assert tx.to_account_id == _ACCOUNT_ID
+
+    assert _INTERNAL_TRANSFER_MISSING not in twin.cash_requirements()
+    sim = simulate(twin, generate_bundle(twin, 30, 64, 7))
+    assert sim.cash_total is not None

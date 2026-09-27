@@ -19,7 +19,7 @@ from coaching_service.forecast_validation_contracts import (
     RegistrationRequest,
     Settlement,
 )
-from coaching_service.forecast_validation_ingestion import IngestionStamp, ingestion_key
+from coaching_service.forecast_validation_ingestion import stored_ingestion_stamp
 from coaching_service.forecast_validation_metrics import calculate_metrics, envelope_metrics
 from coaching_service.forecast_validation_month import freeze_month, require_current_month, settle_month
 from coaching_service.forecast_validation_month_policy import require_month_policy
@@ -52,10 +52,7 @@ class ForecastValidation:
             )
             twin = await self.core.twin(op.owner)
             identity = await anyio.to_thread.run_sync(self.core.engine.identity, twin)
-            stamp_json = await anyio.to_thread.run_sync(
-                repository.store.load, op.owner, ingestion_key(identity.revision)
-            )
-            stamp = None if stamp_json is None else IngestionStamp.model_validate_json(stamp_json)
+            stamp = await stored_ingestion_stamp(repository, op.owner, identity)
             try:
                 source = ForecastSource(coaching=coaching, twin=twin, identity=identity, stamp=stamp)
                 frozen = freeze_receipt(
@@ -111,9 +108,9 @@ class ForecastValidation:
                 or identity.revision <= frozen.identity.revision
             ):
                 raise ServiceError("validation_observation_not_updated", 409)
-            stamp = IngestionStamp.model_validate_json(
-                await self.core.repository.load(op.owner, ingestion_key(identity.revision))
-            )
+            stamp = await stored_ingestion_stamp(self.core.repository, op.owner, identity)
+            if stamp is None:
+                raise ServiceError("resource_not_found", 404)
             if stamp.identity != identity or not frozen.registered_at <= stamp.received_at <= now:
                 raise ServiceError("validation_observation_stamp_mismatch", 409)
             try:

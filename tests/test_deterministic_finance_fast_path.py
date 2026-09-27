@@ -473,7 +473,7 @@ async def test_explicit_fast_path_opt_out_keeps_the_model_backed_catalog_flow(tm
 
 
 @pytest.mark.anyio
-async def test_definition_with_explicit_period_still_returns_period_contract_error(tmp_path: Path) -> None:
+async def test_definition_with_explicit_period_clarifies_without_model(tmp_path: Path) -> None:
     calls = 0
 
     def unexpected_model_call(_: httpx2.Request) -> httpx2.Response:
@@ -499,9 +499,13 @@ async def test_definition_with_explicit_period_still_returns_period_contract_err
                 json={"question": "DSR이 뭐야?", "period": {"kind": "rolling_days", "days": 30}},
                 headers={"Idempotency-Key": "period"},
             )
-    assert response.status_code == 422
-    error = response_object(response.content)["error"]
-    assert error == "period_not_supported_for_intent"
+    # The unsupported period on a definition intent now clarifies (200) instead of a
+    # 503-inducing 4xx, still without ever reaching the model.
+    assert response.status_code == 200, response.text
+    answer = response_object(response.content)
+    assert answer["answer_type"] == "period_review"
+    assert answer["status"] == "needs_clarification"
+    assert answer["fallback_reason"] == "period_not_supported_for_intent"
     assert calls == 0
 
 

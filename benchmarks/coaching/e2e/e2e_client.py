@@ -12,7 +12,9 @@ from benchmarks.coaching.e2e.e2e_runtime import Gateway
 from coaching_service.engine import ENGINE_COMMIT, EngineAdapter
 from coaching_service.evidence import bounded_evidence, operation_evidence
 from coaching_service.llm_contract import EvidenceInput, Operation
-from coaching_service.rendering import authoritative_text
+from coaching_service.numeric_rendering import purchase_verdict_text
+from coaching_service.persona import strip_bold
+from coaching_service.rendering import authoritative_text, deterministic_advice
 from coaching_service.schemas import Coaching, JsonDocument, Receipt
 from coaching_service.settings import Client
 
@@ -22,7 +24,7 @@ def authoritative_fdt(receipt: Receipt) -> bool:
     return (
         receipt.numeric_request is not None
         and receipt.numeric_result is not None
-    ) or (receipt.trigger == "requested_review" and receipt.payment is None)
+    ) or (receipt.trigger in {"requested_review", "balance_check"} and receipt.payment is None)
 
 
 class ScenarioIO:
@@ -107,8 +109,19 @@ class ScenarioIO:
         receipt = coaching.receipt
         stored = await self.request("GET", "/v1/coaching/" + coaching.id)
         self.check("stored_receipt_exact", Coaching.model_validate(stored.root) == coaching)
+        # The full server-composed deterministic block (authoritative engine text,
+        # then any purchase verdict, then the single fact-gated advice sentence)
+        # is preserved verbatim ahead of the model wording, exactly as compose()
+        # builds it (tone defaults to None on the review/event path). A review can
+        # now carry a fact-gated envelope-budget advice sentence, so the preserved
+        # prefix is this whole block, not authoritative_text alone.
+        deterministic_pieces = [authoritative_text(receipt), *purchase_verdict_text(receipt)]
+        advice = deterministic_advice(receipt)
+        if advice is not None:
+            deterministic_pieces.append(advice)
         self.check(
-            "authoritative_text_preserved", coaching.text.startswith(authoritative_text(receipt) + "\n\n")
+            "authoritative_text_preserved",
+            coaching.text.startswith(strip_bold("\n".join(deterministic_pieces)) + "\n\n"),
         )
         self.check("engine_commit_exact", receipt.engine_commit == ENGINE_COMMIT)
         twin = await self.request("GET", "/v1/twin")

@@ -100,13 +100,15 @@ async def test_combined_candidate_keeps_api_period_and_explicit_numeric_contract
             # When finance receives an unsupported period or numeric intent is explicit.
             response = await client.post(path + "/messages", json=payload.root,
                                          headers={"Idempotency-Key": "turn"})
-            # Then period rejection is atomic and explicit numeric requests reach FDT without routing.
+            # Then a finance intent with an unsupported period clarifies (200) instead of a
+            # 503-inducing 4xx, and explicit numeric requests reach FDT without routing.
             if mode == "finance":
-                assert response.status_code == 422
-                assert JsonDocument.model_validate_json(response.content).root["error"] == (
-                    "period_not_supported_for_intent"
-                )
-                assert Session.model_validate_json((await client.get(path)).content) == saved
+                assert response.status_code == 200, response.text
+                answer = JsonDocument.model_validate_json(response.content).root
+                assert answer["answer_type"] == "period_review"
+                assert answer["status"] == "needs_clarification"
+                assert answer["fallback_reason"] == "period_not_supported_for_intent"
+                assert len(Session.model_validate_json((await client.get(path)).content).messages) == 2
                 assert calls == ["route"]
             else:
                 assert response.status_code == 200, response.text

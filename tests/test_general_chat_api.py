@@ -11,6 +11,7 @@ from test_api import OTHER, TOKEN, TestModel, setup
 
 from coaching_service.finance_knowledge import selected_finance_wording
 from coaching_service.llm_contract import EvidenceInput, Mode, Routing, Wording
+from coaching_service.schemas import Session
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -198,9 +199,15 @@ async def test_future_period_is_not_silently_ignored_by_non_forecast_intents(
             json={"question": "현재까지 소비 알려줘", "period": {"kind": "rolling_days", "days": 7}},
             headers={"Idempotency-Key": "turn"},
         )
-        assert response.status_code == 422
-        assert response.json()["error"] == "period_not_supported_for_intent"
-        assert (await client.get(path)).json() == session
+        # A future period on a non-forecast intent is not silently ignored: instead of a
+        # 503-inducing 4xx it now returns a 200 needs_clarification turn asking the user
+        # to restate the period (a recorded turn, still without any model write).
+        assert response.status_code == 200, response.text
+        answer = response.json()
+        assert answer["answer_type"] == "period_review"
+        assert answer["status"] == "needs_clarification"
+        assert answer["fallback_reason"] == "period_not_supported_for_intent"
+        assert len(Session.model_validate_json((await client.get(path)).content).messages) == 2
         assert model.writes == 0
 
 

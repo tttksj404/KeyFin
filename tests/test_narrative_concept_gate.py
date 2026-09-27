@@ -123,7 +123,8 @@ def test_personal_narrative_still_reaches_model(question: str) -> None:
 
 
 @pytest.mark.parametrize(("question", "expect_needs_source"), [
-    ("지금 복리 이자율 제일 높은 곳", False),
+    # Asking where today's highest rate is needs a current source, not a definition.
+    ("지금 복리 이자율 제일 높은 곳", True),
     ("지금 금리가 가장 높은 예금의 구조를 이해하고 싶어", True),
     ("복리 예금 세후 이자 계산 구조를 정리해줘", True),
     ("2026년 복리 구조 정리해줘", False),

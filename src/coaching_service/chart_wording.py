@@ -34,11 +34,32 @@ def chart_evidence(chart: ChartResult) -> EvidenceInput:
             id="total",
             text=(
                 f"입력에서 확인된 현재 변동소비 {chart.total_current:,}원, "
-                f"기간 말 예상 총소비(P50) {chart.total_forecast:,}원입니다."
+                f"기간 말 예상 총소비 {chart.total_forecast:,}원입니다."
                 + (" " + period.quality.summary if period.quality and period.quality.summary else "")
             ),
         ),
     ]
+    if period.purchase is not None and chart.balance.baseline:
+        before = chart.balance.baseline[-1].p50_krw
+        after = chart.total_forecast
+        if chart.total_budget is None:
+            crosses = "전체 예산 정보가 없어 예산 초과 여부는 알 수 없습니다"
+        elif after > chart.total_budget >= before:
+            crosses = "구매 후 전체 예산을 새로 넘습니다"
+        elif after > chart.total_budget:
+            crosses = "구매 전부터 전체 예산을 넘은 상태가 이어집니다"
+        else:
+            crosses = "구매 후에도 전체 예산 안에 머뭅니다"
+        facts.append(
+            ChartFact(
+                id="purchase",
+                text=(
+                    f"계획 구매 전 기간 말 예상 소비 {before:,}원에서 구매 후 {after:,}원으로 "
+                    f"{after - before:,}원 늘며, {crosses}. "
+                    "예산·소비 관점이며 계좌 잔액이나 결제 가능 여부는 보장하지 않습니다."
+                ),
+            )
+        )
     for category in sorted(
         chart.categories,
         key=lambda row: row.forecast - row.budget if row.budget is not None else -float("inf"),
@@ -60,12 +81,15 @@ def chart_evidence(chart: ChartResult) -> EvidenceInput:
         facts.append(
             ChartFact(id="missing_budget", text="예산 정보가 없어 예산 초과 여부는 비교할 수 없습니다.")
         )
+    context_notes = period.quality.notices if period.quality else ()
+    if period.purchase_note:
+        context_notes = (*context_notes, period.purchase_note)
     return EvidenceInput(
         purpose="chart",
         question=chart.question,
         facts_json=ChartFacts(
             facts=tuple(facts),
-            context_notes=period.quality.notices if period.quality else (),
+            context_notes=context_notes,
         ).model_dump_json(),
     )
 

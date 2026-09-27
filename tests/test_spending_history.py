@@ -7,7 +7,7 @@ import pytest
 
 from coaching_service.engine import EngineAdapter
 from coaching_service.schemas import JsonDocument, TransactionView
-from coaching_service.spending_history import spending_answer
+from coaching_service.spending_history import _COVERAGE, _COVERAGE_SHORT, spending_answer
 from tests.test_engine import fixture
 
 
@@ -80,6 +80,12 @@ def test_last_month_matches_independent_raw_ledger_arithmetic() -> None:
     }
     assert answer.coverage == "unknown"
     assert answer.coverage_caveat
+    # 말풍선 본문은 한 문장짜리 짧은 정직성 문구만 담고 장황한 4문장을 붙이지 않는다.
+    assert _COVERAGE_SHORT in answer.text
+    assert _COVERAGE not in answer.text
+    # 전체 근거·범위는 구조화 필드(coverage/basis/coverage_caveat)로 손실 없이 남는다.
+    assert answer.coverage_caveat == _COVERAGE
+    assert answer.basis == "confirmed_envelope_budget_amount"
 
 
 @pytest.mark.parametrize(
@@ -87,6 +93,8 @@ def test_last_month_matches_independent_raw_ledger_arithmetic() -> None:
     [
         ("지난달 외식비 얼마 썼어?", "외식", 12000),
         ("지난달 외식 소비를 다시 확인해줘.", "외식", 12000),
+        # 일상어 "식비"도 엔진 매핑(식비→외식)대로 외식 봉투로 접힌다.
+        ("지난달 식비 얼마 썼어?", "외식", 12000),
         ("내 지난달 교통비 알려줘", "교통비", 5000),
         ("지난달 기타 봉투 소비 알려주세요", "기타", 3000),
     ],

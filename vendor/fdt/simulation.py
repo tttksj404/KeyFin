@@ -253,8 +253,13 @@ def simulate(twin: Twin, bundle: RandomBundle, scenario: dict | None = None) -> 
             if kind in ('income', 'reimbursement'):
                 daily_cash[:, :, ai] += values
             elif kind == 'internal_transfer':
-                daily_cash[:, :, ai] -= values
-                daily_cash[:, :, account_lookup[f['to_account_id']]] += values
+                to_id = f['to_account_id']
+                if to_id in account_lookup:
+                    daily_cash[:, :, ai] -= values
+                    daily_cash[:, :, account_lookup[to_id]] += values
+                # A transfer with no known destination is net-zero on total cash; skip the
+                # per-account move rather than crash or block the absolute forecast. Per-account
+                # realism for that single move is not modeled (unused: calendar owns per-account).
             else:
                 daily_cash[:, :, ai] -= values
 

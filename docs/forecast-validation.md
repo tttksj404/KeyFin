@@ -153,6 +153,12 @@ WIS80 = (0.5 × abs(m-y) + 0.1 × IS80) / 1.5
 
 1. `forecast_validation_contracts.py`: 불변 입력·출력, 원금액·분위수·등급
 2. `forecast_validation_ingestion.py`: Twin과 같은 원자적 쓰기에 포함되는 최초 서버 수신 기록
+
+   Bootstrap은 원장을 전체 교체하므로 새 입력에서 `revision=0`으로 다시 시작할 수 있다. 수신 도장은
+   revision만으로 저장하지 않고 `revision-{n}/digest-{input_digest}` 키에 기록해 서로 다른 Twin 입력
+   epoch를 분리한다. 같은 identity의 재시도는 기존 도장을 보존하며, 이전 배포가 남긴
+   `revision-{n}` 레거시 키는 읽기에서만 fallback한다. 따라서 레거시 도장이 다른 identity와 일치하지
+   않으면 예측 검증을 통과시키지 않는다.
 3. `forecast_validation_receipts.py`: 실제 저장된 예측을 읽고 기간·동일 입력을 검사
 4. `forecast_validation_observations.py`: 별도 원거래 합산과 같은 이력의 baseline
 5. `forecast_validation.py`: 등록·후정산·동일 조건 집계·멱등성

@@ -76,7 +76,8 @@ class Flow:
                     else None
                 )
                 allows_deterministic = numeric_mode in {"forecast", "risk"} or (
-                    answer.receipt.trigger in {"requested_review", "historical_coaching_followup"}
+                    answer.receipt.trigger
+                    in {"requested_review", "balance_check", "historical_coaching_followup"}
                     and answer.model == "not_called"
                 )
             case ChatAnswer():

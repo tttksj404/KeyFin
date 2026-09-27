@@ -97,7 +97,11 @@ function model(input,style={},options={}) {
   const d=normalize(input),s={...DEFAULT_STYLE,...style};
   const scaling=options.scale||'reference';if(!['reference','linear'].includes(scaling))throw new TypeError('scale은 reference 또는 linear입니다.');
   const ratios=d.categories.flatMap(r=>[r.current,r.forecast].filter(v=>v!=null&&r.budget>0).map(v=>v/r.budget));
-  let maxRatio=scaling==='linear'?Math.max(1,...ratios):1;
+  // linear 도 한 봉투의 극단값(예: 2414%)이 축을 차지해 나머지 막대가 안 보이지 않게 상한을 둔다.
+  // 상한을 넘는 막대는 잘리고(clipped) 라벨·툴팁은 원래 %를 그대로 보여 준다.
+  const cap=options.maxScale??1.2;
+  if(!(Number.isFinite(cap)&&cap>=1))throw new TypeError('maxScale은 1 이상의 유한한 수입니다.');
+  let maxRatio=scaling==='linear'?Math.min(cap,Math.max(1,...ratios)):1;
   let minRatio=scaling==='linear'?Math.min(0,...ratios):0;
   if(maxRatio===minRatio)maxRatio=minRatio+1;
   const trackLeft=s.padX+82,trackWidth=363-s.padX-trackLeft-40,rowHeight=30,barHeight=14;
@@ -153,7 +157,7 @@ function cardSvg(input,style={},options={}) {
     const v=labelMode==='forecast'&&!currentOnly?r.forecast:r.current;
     const ratio=v==null||r.budget<=0||r.budget==null?null:v/r.budget*100;
     const label=r.budget===0?(v>0?'무예산':'—'):pct(ratio);
-    const tip=`${r.fullLabel}\n현재 ${money(r.current)}${r.currentBar?' ('+pct(r.currentBar.percent)+')':''}\n기간 말 예측 ${money(r.forecast)}${r.forecastBar?' ('+pct(r.forecastBar.percent)+')':''}\n예산 ${money(r.budget)}${(r.currentBar?.clipped||r.forecastBar?.clipped)&&m.scaling==='reference'?'\n길이는 0~100% 범위로 제한합니다. 원래 값은 수치로 표시합니다.':''}`;
+    const tip=`${r.fullLabel}\n현재 ${money(r.current)}${r.currentBar?' ('+pct(r.currentBar.percent)+')':''}\n기간 말 예측 ${money(r.forecast)}${r.forecastBar?' ('+pct(r.forecastBar.percent)+')':''}\n예산 ${money(r.budget)}${(r.currentBar?.clipped||r.forecastBar?.clipped)?'\n길이는 0~'+Math.round(m.maxRatio*100)+'% 범위로 제한합니다. 원래 값은 수치로 표시합니다.':''}`;
     svg+=`<g class="kf-bar" tabindex="0" role="button" data-id="${esc(r.id)}" aria-label="${esc(tip)}"><title>${esc(tip)}</title><rect x="${s.padX}" y="${by-8}" width="${363-s.padX*2}" height="${m.rowHeight}" fill="transparent"/><defs><clipPath id="${cid}"><rect x="${r.x}" y="${by}" width="${bw}" height="${bh}" rx="${rad}"/></clipPath></defs>`;
     svg+=`<rect class="budget-track" x="${r.x}" y="${by}" width="${bw}" height="${bh}" rx="${rad}" fill="${c.track}" fill-opacity=".18"/>`;
     const draw=(g,cls,alpha)=>{

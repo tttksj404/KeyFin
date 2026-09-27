@@ -9,7 +9,14 @@ from coaching_service.forecast_validation_ingestion import ingestion_writes
 from coaching_service.llm_contract import Judgment
 from coaching_service.payments import Detection, Ledger, reconcile_cancellation, reduce_payment
 from coaching_service.repository import Mutation, document, write
-from coaching_service.schemas import Bootstrap, EventRequest, EventResult, JsonDocument
+from coaching_service.schemas import (
+    BUDGET_CONFIG_KEY,
+    Bootstrap,
+    BudgetConfig,
+    EventRequest,
+    EventResult,
+    JsonDocument,
+)
 from coaching_service.store import Operation
 
 
@@ -24,9 +31,21 @@ class Events:
             twin = await anyio.to_thread.run_sync(self.core.engine.create, request, op.owner)
             identity = await anyio.to_thread.run_sync(self.core.engine.identity, twin)
             ingress = await ingestion_writes(self.core.repository, op.owner, identity, op.digest)
+            # 예산 시작일은 고정 FDT snapshot이 아니라 서비스측 별도 키에 보관한다.
+            # 생략하면 기록하지 않아 기간 계산이 1일로 폴백(기존 동작)한다.
+            budget_config = (
+                (write(BUDGET_CONFIG_KEY, BudgetConfig(start_day=request.budget_start_day)),)
+                if request.budget_start_day is not None
+                else ()
+            )
             return Mutation(
                 result=document(identity),
-                writes=(write("twin", twin), write("ledger", Ledger(envelopes=request.envelopes)), *ingress),
+                writes=(
+                    write("twin", twin),
+                    write("ledger", Ledger(envelopes=request.envelopes)),
+                    *budget_config,
+                    *ingress,
+                ),
             )
 
         return await self.core.repository.mutate(op, action)

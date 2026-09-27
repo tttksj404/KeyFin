@@ -79,7 +79,7 @@ class Charts:
                 seed=request.seed,
                 observation_audit=observation_audit,
             )
-            chart = project_chart(inputs, numeric_result, daily_prediction)
+            chart = project_chart(inputs, numeric_result, daily_prediction, request.purchase)
             if numeric_result is None:
                 wording = Wording(
                     text="예산 기간이 종료되어 입력에 기록된 소비를 표시합니다."

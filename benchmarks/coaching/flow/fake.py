@@ -38,4 +38,4 @@ class SyntheticModel:
 
 
 def from_environment() -> FastAPI:
-    return create_app(Settings(), SyntheticModel())
+    return create_app(Settings(persona="plain"), SyntheticModel())

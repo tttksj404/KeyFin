@@ -89,6 +89,7 @@ async def run_suite(config: RunConfig, *, upstream_client: httpx2.AsyncClient | 
             database=config.output / "service.sqlite3",
             clients=credentials,
             model=ModelConfig(endpoint_url=gateway_base, model=config.model),
+            persona="plain",
         )
         async with (
             serve(create_app(settings)) as api_base,

@@ -184,6 +184,29 @@ _STATEFUL_FINANCE_REQUEST: Final = re.compile(
 # an authenticated user's "월 고정비 합계 보여줘"). These lookup verbs must
 # retain the personal/FDT routing contract rather than letting catalog retrieval
 # turn them into a general-knowledge selection.
+# "예산 괜찮을까요?" / "돈 버틸 수 있을까" ask about the user's own budget even with no
+# possessive or time word; they must never be answered with the budgeting concept.
+_PERSONAL_BUDGET_STATE: Final = re.compile(
+    r"(?:예산|잔액|잔고|봉투|생활비|카드값|용돈|통장|돈)\s*(?:이|은|는|가|을|를|으로|로)?\s*.{0,12}"
+    r"(?:괜찮|여유|버틸|버티|남을|남아|남았|부족|모자|넉넉|빠듯)"
+    r"|(?:버틸|버티).{0,12}(?:예산|잔액|잔고|생활비|돈)"
+)
+# "예산이 부족할 때 뭐 해?" asks a concept; "외식 더 하면 예산 모자라?" is still this budget.
+_BUDGET_STATE_NOT_OWN: Final = re.compile(
+    r"뭐|뜻|방법|어떻게|설명|요령|대처|쓰는\s*게|법\s*(?:알려|좀)"
+    r"|(?:괜찮|여유|버틸|버티|남을|남아|남았|부족|모자|넉넉|빠듯)[가-힣]{0,3}\s*(?:때|면|해도|아도|어도|으면)"
+    r"(?![가-힣]*\?*$)"
+)
+
+
+def _own_budget_state(question: str) -> bool:
+    """Tell whether the question asks about the user's own budget ("예산 괜찮을까요?")."""
+    return (
+        _PERSONAL_BUDGET_STATE.search(question) is not None
+        and _BUDGET_STATE_NOT_OWN.search(question) is None
+    )
+
+
 _PERSONAL_DATA_LOOKUP: Final = re.compile(
     r"(?:계좌|잔액|소비|지출|결제|예산|자산|부채|보험료|소득|고정비|금융\s*목표).{0,24}"
     r"(?:얼마|합계|보여|조회|내역|현황|목록|알려)"
@@ -217,10 +240,76 @@ _VOLATILE_OR_DECISION_REQUEST: Final = re.compile(
 _QUALITATIVE_AMOUNT_GUIDE_REQUEST: Final = re.compile(
     r"비상금.{0,12}(?:얼마|적정|적당|알맞)"
 )
+_RATE_NOUN: Final = re.compile(
+    r"금리|이자율|수익률|환율|시세|매매기준율|기준율|달러|엔화|유로|위안|이자\s*(?:를\s*)?(?:많이|제일|가장)"
+)
 _LATEST_STATUS_REQUEST: Final = re.compile(
     r"(?:최신|오늘|지금|현재|이번\s*주|가장|최고|최저|높은|낮은).{0,32}"
-    r"(?:금리|규정|규제|한도|조건|상품|수익률|예금|적금)"
+    r"(?:금리|이자율|규정|규제|한도|조건|상품|수익률|예금|적금|파킹\s*통장|환율|시세|이자\s*(?:를\s*)?(?:많이|제일|가장))"
+    # "요즘", "최근", "올해", "이번 달", "제일" mark a current value only before a rate or
+    # price ("요즘 적금 금리"); "요즘 적금이 뭐야?" stays the 적금 concept.
+    r"|(?:요즘|최근|올해|이번\s*달|제일).{0,32}(?:금리|이자율|수익률|환율|시세|매매기준율|이자\s*(?:를\s*)?(?:많이|제일|가장))"
+    # A rate named first and its current level asked after ("환율 얼마야", "적금 금리 제일
+    # 높은 곳 어디야"). A comparative alone ("금리가 높은 이유") is a concept question.
+    r"|(?:금리|이자율|환율|수익률|시세|매매기준율).{0,20}(?:얼마|몇\s*(?:%|퍼센트|프로))(?!\s*면)"
+    r"|(?:금리|이자율|환율|수익률|시세|매매기준율).{0,20}(?:제일|가장|최고|최저|높은|낮은).{0,12}"
+    r"(?:곳|데|은행|상품|어디|어느|추천|알려|(?:거|것)(?:이|은|는)?\s*"
+    r"(?:뭐(?!가\s*(?:좋|나쁘|나빠|문제|달라|다르|단점|장점|안\s*좋|유리|불리))|어디|어느|알려|추천|있))"
+    # Today's exchange rate named by currency ("오늘 달러 얼마야", "엔화 100엔에 얼마야").
+    r"|(?:달러|엔화|유로|위안|원\s*달러).{0,16}(?:얼마|몇|시세|기준율)"
+    r"|(?:달러|엔화|유로|위안|원\s*달러)\s*환율\s*(?:좀\s*|지금\s*|오늘\s*)?(?:알려|어때|보여)"
 )
+# Why/whether a rate matters is explained by the catalog, never a current-rate request.
+_RATE_REASON: Final = re.compile(
+    r"이유|왜|항상|무조건|좋은\s*거|좋은\s*게|유리|오르면|내리면|떨어지면|올라가면|내려가면|되면|두\s*배"
+)
+# "현재 기준금리 몇 %야? 오르면 대출 이자 어떻게 돼?" still asks today's level first.
+_RATE_NOW: Final = re.compile(
+    r"(?:지금|현재|오늘|요즘|최근|이번\s*주)\s*(?:의\s*)?"
+    r"(?:(?:기준|대출|예금|적금|달러|엔화|유로|위안|원\s*달러)\s*)?(?:금리|환율|이자율|수익률|시세|가장|제일)"
+)
+_RATE_LEVEL: Final = re.compile(
+    r"몇\s*(?:%|퍼센트|프로)(?!\s*(?:면|라면|이면))|얼마(?:야|예요|에요|인가|인지|지|니)|가장|제일|최고|최저"
+)
+# A rate the user supplies ("금리 5%인데 1% 오르면") is a hypothetical, not a lookup.
+_RATE_GIVEN: Final = re.compile(r"\d+(?:\.\d+)?\s*%\s*(?:인데|이면|라면|면)")
+# ...unless today's best or level is still asked after it ("적금 3%인데 제일 높은 곳 어디야?").
+_LATEST_AFTER_GIVEN: Final = re.compile(
+    r"(?:제일|가장|최고|최저)\s*(?:금리가?\s*)?(?:높|낮|좋|싸|싼|저렴|유리|많이\s*주)"
+    r"|어디(?:가|야|예요|에요|인지|일까|있)|어느\s*(?:은행|곳|상품|데)|추천"
+    r"|(?:지금|현재|요즘|오늘|최근)\s*(?:의\s*)?(?:기준|대출|예금|적금|주담대|달러|엔화)?\s*(?:금리|환율|이자율|시세)"
+)
+
+
+def _rate_only_given(question: str) -> bool:
+    """Whether the user supplies the rate and asks nothing current after it."""
+    given = _RATE_GIVEN.search(question)
+    return given is not None and _LATEST_AFTER_GIVEN.search(question, given.end()) is None
+
+
+_RATE_HYPOTHETICAL: Final = re.compile(r"오르면|내리면|떨어지면|올라가면|내려가면|되면|[0-9두세]\s*배")
+
+
+def _asks_rate_now(question: str) -> bool:
+    """Whether today's level is asked before any hypothetical ("현재 기준금리 몇 %야? 오르면…")."""
+    level = _RATE_LEVEL.search(question)
+    hypothetical = _RATE_HYPOTHETICAL.search(question)
+    return (
+        _RATE_NOW.search(question) is not None
+        and level is not None
+        and not _rate_only_given(question)
+        and (
+            hypothetical is None
+            or level.start() < hypothetical.start()
+            # "기준금리 오르면 현재 대출 금리 몇 %야?" asks today's level after the condition.
+            or _RATE_NOW.search(question, hypothetical.end()) is not None
+        )
+    )
+
+
+def asks_current_rate(question: str) -> bool:
+    """Whether the question names a rate or price whose current value it may be asking."""
+    return _RATE_NOUN.search(question) is not None
 _TAX_CALCULATION_STATUS_REQUEST: Final = re.compile(
     r"(?:세후|세금).{0,32}(?:정확|계산|얼마|수익)"
     r"|(?:정확|계산|얼마|수익).{0,32}(?:세후|세금)"
@@ -229,6 +318,10 @@ _TAX_CALCULATION_STATUS_REQUEST: Final = re.compile(
 # concept catalog. Their payoff and early-redemption conditions depend on the
 # individual issuer document, so they must never be captured by the generic
 # loan early-repayment record merely because both contain ``조기상환``.
+_INVESTMENT_DECISION_TEXT: Final = (
+    "특정 주식·펀드·코인을 사거나 팔지는 판단해 드리지 않아요. "
+    "분산투자·ETF·채권 같은 개념 설명이나 이번 기간 예산·소비 확인은 도와드릴 수 있어요."
+)
 _UNREVIEWED_COMPLEX_PRODUCT_REQUEST: Final = re.compile(
     r"(?:els|주가연계증권|녹인|녹아웃)", re.IGNORECASE,
 )
@@ -326,6 +419,7 @@ def model_selected_finance_evidence(evidence: EvidenceInput) -> EvidenceInput | 
         or _PERSONAL_MARKER.search(evidence.question) is not None
         or _STATEFUL_FINANCE_REQUEST.search(evidence.question) is not None
         or _PERSONAL_DATA_LOOKUP.search(evidence.question) is not None
+        or _own_budget_state(evidence.question)
         or _VOLATILE_OR_DECISION_REQUEST.search(evidence.question) is not None
     ):
         return None
@@ -801,6 +895,7 @@ def _stable_catalog_facts(
         )
         or _PERSONAL_MARKER.search(evidence.question) is not None
         or _STATEFUL_FINANCE_REQUEST.search(evidence.question) is not None
+        or _own_budget_state(evidence.question)
         or (
             _VOLATILE_OR_DECISION_REQUEST.search(evidence.question) is not None
             and _QUALITATIVE_AMOUNT_GUIDE_REQUEST.search(evidence.question) is None
@@ -950,7 +1045,14 @@ def deterministic_finance_status(evidence: EvidenceInput) -> FinanceWording | No
     missing: tuple[MissingInformation, ...] | None = None
     if _UNREVIEWED_COMPLEX_PRODUCT_REQUEST.search(evidence.question) is not None:
         missing = ()
-    elif _LATEST_STATUS_REQUEST.search(evidence.question) is not None:
+    elif (
+        _LATEST_STATUS_REQUEST.search(evidence.question) is not None
+        and not _rate_only_given(evidence.question)
+        and (
+            _RATE_REASON.search(evidence.question) is None
+            or _asks_rate_now(evidence.question)
+        )
+    ):
         missing = ("latest_source",)
     elif _TAX_CALCULATION_STATUS_REQUEST.search(evidence.question) is not None:
         missing = ("tax_terms", "calculation")
@@ -961,6 +1063,36 @@ def deterministic_finance_status(evidence: EvidenceInput) -> FinanceWording | No
     if wording.answer_status != "needs_source" or wording.reference_ids:
         return None
     return wording.model_copy(update={"source": "template"})
+
+
+def investment_decision_wording() -> FinanceWording:
+    """Decline a buy/sell decision on a named investment and say what the coach can do."""
+    return FinanceWording(
+        text=_INVESTMENT_DECISION_TEXT, source="template", model="not_called", answer_status="out_of_scope",
+    )
+
+
+def names_catalog_subject(question: str) -> bool:
+    """Whether the question itself names a catalog concept ("ETF", "신용점수", "리볼빙").
+
+    Retrieval alone is no evidence: a generic how-to ("잠이 안 오는데 어떻게 해?") retrieves
+    the whole catalog.
+    """
+    text = compact(question)
+    return any(
+        len(alias) >= 2 and alias in text
+        for fact in _BY_ID.values()
+        for alias in (compact(name) for name in (fact.title, *fact.aliases))
+    )
+
+
+def has_catalog_subject(evidence: EvidenceInput) -> bool:
+    """Whether retrieval found at least one approved concept for this question."""
+    try:
+        supplied = JsonDocument.model_validate_json(evidence.facts_json).root.get("knowledge_facts")
+    except ValueError:
+        return False
+    return isinstance(supplied, list) and bool(supplied)
 
 
 def reference_document(keys: tuple[str, ...]) -> str:

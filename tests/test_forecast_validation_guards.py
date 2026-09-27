@@ -4,6 +4,7 @@
 from pathlib import Path
 
 import pytest
+from test_engine import fixture
 from test_forecast_validation_support import (
     BASE,
     Clock,
@@ -15,6 +16,8 @@ from test_forecast_validation_support import (
     settle,
 )
 
+from coaching_service.forecast_validation_ingestion import IngestionStamp, ingestion_key
+from coaching_service.schemas import TwinIdentity
 from coaching_service.store import Store
 
 
@@ -107,6 +110,112 @@ async def test_legacy_unstamped_receipt_is_replay_only(
         assert replay.json()["evidence_tier"] == "replay"
         assert replay.json()["ingestion_received_at"] is None
         assert replay.json()["real_accuracy_validated"] is False
+
+
+@pytest.mark.anyio
+async def test_bootstrap_replacement_does_not_reuse_an_old_revision_stamp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A full Twin replacement may reset revision zero without blocking the next event."""
+    clock = Clock()
+    path = tmp_path / "bootstrap-replacement.sqlite3"
+    async with client_for(build(path, clock, monkeypatch)) as client:
+        original = fixture().model_dump(mode="json")
+        initialized = await client.post(
+            "/v1/twin", json=original, headers={"Idempotency-Key": "bootstrap-one"}
+        )
+        assert initialized.status_code == 200, initialized.text
+        source_row = original["transactions"][0]
+        before_reset = await client.post(
+            "/v1/events",
+            json={
+                "expected_revision": 0,
+                "event": {
+                    "type": "transaction",
+                    "event_id": "before-reset",
+                    "user_id": "demo",
+                    "transaction": {
+                        **source_row,
+                        "transaction_id": "before-reset",
+                        "transaction_date": "2026-09-10",
+                        "amount_krw": 1000,
+                    },
+                },
+            },
+            headers={"Idempotency-Key": "event-before-reset"},
+        )
+        assert before_reset.status_code == 200, before_reset.text
+        assert before_reset.json()["identity"]["revision"] == 1
+
+        replacement = fixture().model_dump(mode="json")
+        replacement["transactions"][0]["amount_krw"] = source_row["amount_krw"] + 1
+        refreshed = await client.post(
+            "/v1/twin", json=replacement, headers={"Idempotency-Key": "bootstrap-two"}
+        )
+        assert refreshed.status_code == 200, refreshed.text
+        assert refreshed.json()["revision"] == 0
+        assert refreshed.json()["input_digest"] != initialized.json()["input_digest"]
+
+        after_reset = await client.post(
+            "/v1/events",
+            json={
+                "expected_revision": 0,
+                "event": {
+                    "type": "transaction",
+                    "event_id": "after-reset",
+                    "user_id": "demo",
+                    "transaction": {
+                        **replacement["transactions"][0],
+                        "transaction_id": "after-reset",
+                        "transaction_date": "2026-09-11",
+                        "amount_krw": 2000,
+                    },
+                },
+            },
+            headers={"Idempotency-Key": "event-after-reset"},
+        )
+        assert after_reset.status_code == 200, after_reset.text
+        assert after_reset.json()["identity"]["revision"] == 1
+
+    with Store(path).connection() as connection:
+        keys = tuple(
+            row[0]
+            for row in connection.execute(
+                "SELECT key FROM items WHERE owner=? AND key LIKE 'forecast-ingestion/%' ORDER BY key",
+                ("demo",),
+            ).fetchall()
+        )
+    assert sum(key.startswith("forecast-ingestion/revision-0/digest-") for key in keys) == 2
+    assert sum(key.startswith("forecast-ingestion/revision-1/digest-") for key in keys) == 2
+
+
+@pytest.mark.anyio
+async def test_current_digest_stamp_wins_over_a_legacy_revision_collision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stale legacy row cannot shadow the current identity-bound receipt."""
+    clock = Clock()
+    path = tmp_path / "legacy-collision.sqlite3"
+    async with client_for(build(path, clock, monkeypatch)) as client:
+        original = (await forecast(client)).json()
+        identity = TwinIdentity.model_validate(original["receipt"]["identity"])
+        stale_identity = identity.model_copy(update={"input_digest": "f" * 64})
+        stale_stamp = IngestionStamp(
+            identity=stale_identity,
+            received_at=clock.time(),
+            request_digest="a" * 64,
+        )
+        with Store(path).connection() as connection:
+            _ = connection.execute(
+                "INSERT INTO items(owner,key,payload) VALUES(?,?,?)",
+                ("demo", ingestion_key(identity.revision), stale_stamp.model_dump_json()),
+            )
+
+        registered = await register(client, original["id"])
+        assert registered.status_code == 200, registered.text
+        assert registered.json()["evidence_tier"] == "prospective_attested"
 
 
 @pytest.mark.anyio

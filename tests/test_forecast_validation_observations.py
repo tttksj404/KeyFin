@@ -57,6 +57,7 @@ def raw(**changes: str | int) -> RawTransaction:
         ({"exclude_tag": "DUTCH"}, 50000),
         ({"exclude_tag": "EMERGENCY"}, 50000),
         ({"exclude_tag": "CARRYOVER"}, 50000),
+        ({"exclude_tag": "BUDGET_EXCLUDED"}, 50000),
         ({"confirm_status": "PENDING"}, None),
         ({"status": "CANCELED"}, 0),
     ],

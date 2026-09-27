@@ -230,6 +230,7 @@ async def run(output: Path, *, rounds: int, conditions: Sequence[int]) -> dict[s
                     Client(user_id=f"direct-{index}", token=token)
                     for index, token in enumerate(tokens)
                 ),
+                persona="plain",
             ),
             ModelMustNotRun(),
         )

@@ -19,7 +19,7 @@ ENUMS = {
     'source': {'SEED','LIVE'}, 'direction': {'INCOME','EXPENSE','TRANSFER'},
     'transaction_type': {'CARD','WITHDRAW','DEPOSIT','TRANSFER_IN','TRANSFER_OUT','TRANSFER','CARD_BILL','CARD_SETTLEMENT'},
     'payment_method': {'CARD','ACCOUNT'}, 'confirm_status': {'AUTO','CONFIRMED','PENDING'},
-    'exclude_tag': {'NONE','INTERNAL_TRANSFER','SELF_TRANSFER','DUTCH','EMERGENCY','CARRYOVER'},
+    'exclude_tag': {'NONE','INTERNAL_TRANSFER','SELF_TRANSFER','DUTCH','EMERGENCY','CARRYOVER','BUDGET_EXCLUDED'},
     'status': {'NORMAL','CANCELED'}, 'spend_pattern': {'ROUTINE','PLANNED','FIXED','IMPULSE','N/A'}
 }
 
