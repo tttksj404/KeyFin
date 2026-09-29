@@ -1,5 +1,6 @@
 """Bounded Korean period recognition; unsupported or conflicting periods never become seven days."""
 
+import calendar
 import re
 from datetime import date
 from typing import Final
@@ -22,7 +23,7 @@ from coaching_service.periods import (
 from coaching_service.schemas import JsonDocument
 
 _PERIOD: Final = re.compile(
-    r"(?P<date>\d{4}-\d{2}-\d{2})\s*(?:마감\s*)?까지"
+    r"(?P<date>\d{4}-\d{2}-\d{2})\s*(?:마감\s*)?(?:까지|에(?!서))"
     # "이번 달까지", "이번 달 안에", "월말 전에", "다음달까지" name the same month end.
     r"|(?P<month>(?:이번\s*달|이달)(?:\s*말)?(?:\s*(?:까지|에|안에|내에|중에))?"
     r"|월말(?:\s*전(?:에|까지)?)?(?:\s*(?:까지|에))?)"
@@ -46,11 +47,51 @@ _UNSUPPORTED_CALENDAR: Final = re.compile(r"윤달|음력|영업일|공휴일")
 _ACTIVITY_TIME: Final = re.compile(
     r"(?:주말|오늘|내일|이번\s*주말)\s*(?:에|에는)?\s*뭐\s*(?:하지|할까|해|하니|먹지|먹을까)(?![가-힣])"
 )
+# "이번 달 중순을 지났는데 …" says where in the month today is; the period asked is still this month.
+_MONTH_POSITION: Final = re.compile(
+    r"(?<=달)\s*(?:도\s*)?(?:중순|초순|하순|초|중반|후반)(?:을|이|쯤|은)?\s*"
+    r"(?:지났는데|지나서|넘었는데|넘어서|인데|이라서|이니까|이라|지나고)"
+)
 # "다음 주부터 매일 택시 타면 이번 달 적자야?": the start of a habit, not the period asked about.
 _HABIT_START: Final = re.compile(
     r"(?:오늘|내일|모레|다음\s*주|이번\s*주|주말)\s*부터(?!\s*\d{1,3}\s*일)"
     r"(?=.{0,20}?(?:타면|시키면|먹으면|가면|쓰면|하면|사면|내면|다니면|마시면))"
 )
+
+
+# "9월 말에 얼마 남을까?" names the month by number; relative to the reference date it is this
+# month or the next one. "9월 30일까지" names a day. Other months stay unresolved.
+_NAMED_DAY: Final = re.compile(
+    r"(?<![\d./-])(?P<month>\d{1,2})\s*월\s*(?P<day>\d{1,2})\s*일(?=\s*(?:마감\s*)?(?:까지|에))"
+)
+_NAMED_MONTH: Final = re.compile(r"(?<![\d./-])(?P<month>\d{1,2})\s*월(?!\s*\d)(?P<end>\s*말)?")
+
+
+def named_calendar(question: str, reference: date, budget_start_day: int = 1) -> str:
+    """Rewrite a numbered month or day into the period words the parser supports."""
+    def day(found: re.Match[str]) -> str:
+        month, number = int(found.group("month")), int(found.group("day"))
+        year = reference.year + (month < reference.month)
+        if not 1 <= month <= 12 or not 1 <= number <= calendar.monthrange(year, month)[1]:
+            return found.group(0)
+        return date(year, month, number).isoformat()
+
+    def month(found: re.Match[str]) -> str:
+        number = int(found.group("month"))
+        following = reference.month % 12 + 1
+        if number not in (reference.month, following):
+            return found.group(0)
+        end = found.group("end") or ""
+        if budget_start_day == 1:
+            return ("이번 달" if number == reference.month else "다음 달") + end
+        if not end:
+            # A budget month that starts mid-month is not the calendar month "9월" names.
+            return found.group(0)
+        year = reference.year + (number < reference.month)
+        last = date(year, number, calendar.monthrange(year, number)[1]).isoformat()
+        return last if re.match(r"\s*(?:까지|에(?!서))", found.string[found.end():]) else f"{last}까지"
+
+    return _NAMED_MONTH.sub(month, _NAMED_DAY.sub(day, question))
 
 
 def question_period(question: str, *, explicit: bool) -> PeriodSpec | None:  # noqa: C901 - 지원 기간 표현이 하나씩 늘며 분기가 누적된 단일 파서; 분해보다 한 곳 유지가 안전하다.
@@ -61,7 +102,7 @@ def question_period(question: str, *, explicit: bool) -> PeriodSpec | None:  # n
     """
     if _UNSUPPORTED_CALENDAR.search(question):
         raise ServiceError("period_unsupported_calendar")
-    question = _ACTIVITY_TIME.sub(" ", _HABIT_START.sub(" ", question))
+    question = _MONTH_POSITION.sub(" ", _ACTIVITY_TIME.sub(" ", _HABIT_START.sub(" ", question)))
     matches = list(_PERIOD.finditer(question))
     if len(matches) > 1 and not all(match.group("month") for match in matches):
         # "이번 달 … 월말 잔액" names this month end twice; different periods still conflict.
@@ -114,7 +155,8 @@ def turn_period(
     같은 미래 구간을 가리켜야 계산을 시작한다. 예산 주기는 ``budget_start_day``
     (없으면 1일)로 정해 "이번 달" 기간이 설정 시작일을 따른다.
     """
-    recognized = question_period(question, explicit=explicit is not None)
+    named = named_calendar(question, reference, budget_start_day)
+    recognized = question_period(named, explicit=explicit is not None)
     source: PeriodSource = "default"
     spec: PeriodSpec = _default_spec(reference, budget_start_day)
     if analysis is not None:

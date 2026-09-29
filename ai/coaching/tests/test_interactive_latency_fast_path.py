@@ -290,6 +290,7 @@ def test_natural_goal_rejects_ambiguous_or_advisory_language(question: str) -> N
     # 일상어 "식비"도 엔진 매핑(식비→외식)대로 외식 봉투 절감으로 접힌다.
     ("이번 달 식비를 20% 줄이면 어떻게 될까?", {"expense_reductions": {"외식": 0.2}}),
     ("다음 달 변동 지출을 10% 줄이면 잔액이 어떻게 달라져?", {"expense_multiplier": 0.9}),
+    ("외식비를 20% 줄이면 어떻게 될까?", {"expense_reductions": {"외식": 0.2}}),
 ])
 def test_natural_what_if_requires_one_explicit_variable_expense_branch(
     question: str, scenario: dict[str, object],
@@ -304,7 +305,11 @@ def test_natural_what_if_requires_one_explicit_variable_expense_branch(
     "이번 달 외식비와 쇼핑비를 20% 줄이면 어떻게 될까?",
     "이번 달 외식비를 20% 줄이는 방법 알려줘.",
     "이번 달 고정비를 20% 줄이면 어떻게 될까?",
-    "외식비를 20% 줄이면 어떻게 될까?",
+    # A cut that already happened, a how-to, or a week cannot be an FDT branch. A cut with
+    # no period at all is this budget cycle's, like every other period-less turn.
+    "지난달 외식비를 20% 줄였더니 얼마나 아꼈어?",
+    "외식비를 20% 줄이려면 어떻게 해야 돼?",
+    "다음 주 외식비를 20% 줄이면 어떻게 될까?",
     "이번 달 외식비를 20% 줄이고 30% 더 줄이면 어떻게 될까?",
     "이번 달 외식비를 100% 줄이면 어떻게 될까?",
     "이번 달 외식비를 20% 줄여서 10만원이 되면 어떻게 될까?",

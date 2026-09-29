@@ -19,7 +19,11 @@ from pydantic import (
 from pydantic_core import PydanticCustomError
 
 Source = Literal["llm", "template"]
-Mode = Literal["review", "risk", "forecast", "finance", "history", "personal", "other"]
+# purchase·goal·what_if·balance name an intent only; the service reads every value from the question.
+Mode = Literal[
+    "review", "risk", "forecast", "finance", "history", "personal", "other",
+    "purchase", "goal", "what_if", "balance",
+]
 Operation = Literal["write", "judge", "route"]
 _FACTS: Final = TypeAdapter(dict[str, JsonValue])
 

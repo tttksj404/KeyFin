@@ -178,7 +178,7 @@ def test_question_period_distinguishes_current_and_next_calendar_months() -> Non
 @pytest.mark.parametrize(
     "question",
     [
-        "한 달 뒤", "1개월 뒤", "다음 주 예산", "목표일까지", "9월 30일까지", "30일에 결제해",
+        "한 달 뒤", "1개월 뒤", "다음 주 예산", "목표일까지", "9월 5일까지", "12월 말까지", "30일에 결제해",
         "30일 뒤 말고 90일 뒤", "30일 이내", "-30일 뒤", "1.5일 뒤", "1000일 뒤", "30영업일 뒤",
         "음력 윤달 말까지", "2026-09-11부터 2026-10-10까지", "30일 전", "30일 이후", "91일 뒤",
         "이번 달 초 잔액", "이번 달 중순 잔액", "이틀 뒤", "열흘 뒤", "올해 말까지",
@@ -187,6 +187,16 @@ def test_question_period_distinguishes_current_and_next_calendar_months() -> Non
 def test_unsupported_or_ambiguous_question_never_silently_defaults(question: str) -> None:
     with pytest.raises(ServiceError):
         turn_period(date(2026, 9, 10), question, None, None)
+
+
+def test_numbered_month_or_day_reads_relative_to_the_reference_date() -> None:
+    reference = date(2026, 9, 10)
+    assert turn_period(reference, "9월 30일까지 버틸 수 있어?", None, None).forecast_end == date(2026, 9, 30)
+    assert turn_period(reference, "9월 말에 얼마 남을까?", None, None).forecast_end == date(2026, 9, 30)
+    assert turn_period(reference, "10월 말에 얼마 남을까?", None, None).forecast_end == date(2026, 10, 31)
+    # 10월 초 is a part of next month, not a period end.
+    with pytest.raises(ServiceError):
+        turn_period(reference, "10월 초에 돈 남아?", None, None)
 
 
 def test_explicit_period_and_numeric_horizon_must_agree() -> None:

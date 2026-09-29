@@ -208,7 +208,7 @@ def _own_budget_state(question: str) -> bool:
 
 
 _PERSONAL_DATA_LOOKUP: Final = re.compile(
-    r"(?:계좌|잔액|소비|지출|결제|예산|자산|부채|보험료|소득|고정비|금융\s*목표).{0,24}"
+    r"(?:계좌|잔액|소비|지출|결제|예산|자산|부채|보험료|소득(?!세)|고정비|금융\s*목표).{0,24}"
     r"(?:얼마|합계|보여|조회|내역|현황|목록|알려)"
 )
 # A direct catalog response is safe only for stable education. Current market
@@ -258,6 +258,17 @@ _LATEST_STATUS_REQUEST: Final = re.compile(
     # Today's exchange rate named by currency ("오늘 달러 얼마야", "엔화 100엔에 얼마야").
     r"|(?:달러|엔화|유로|위안|원\s*달러).{0,16}(?:얼마|몇|시세|기준율)"
     r"|(?:달러|엔화|유로|위안|원\s*달러)\s*환율\s*(?:좀\s*|지금\s*|오늘\s*)?(?:알려|어때|보여)"
+    # A market quote asked now: "오늘 코스닥 지수 알려줘", "지금 삼성전자 주가 얼마예요?",
+    # "달러 환율 지금 어떻게 되냐", "요근래 환율이 어떤 추세예요?", "금값 지금 얼마".
+    r"|(?:지금|오늘|현재|요즘|최근|요근래|최신).{0,16}"
+    r"(?:주가|지수|코스피|코스닥|나스닥|금값|은값|금\s*가격|금\s*시세|현물금|유가|환율|기준\s*금리|금리|가격|시세"
+    r"|실업률|물가|미국\s*주식|현재가|상승률|인플레이션율|캐시백|캐쉬백)"
+    r".{0,16}(?:얼마|몇|어떻게\s*(?:돼|되|됨)|어때|알려|추세|보여|상태|오르|내리|떨어|데이터)"
+    r"|(?:금리|적금|예금).{0,12}(?:top|탑|순위|랭킹)|(?:적금|예금)\s*rate"
+    r"|(?:오늘|지금|현재)\s*(?:주가|지수|환율|금값|시세)(?:는|은)?\s*[?]*$|실시간"
+    r"|현재가\s*(?:얼마|알려|몇)"
+    r"|(?:주가|지수|코스피|코스닥|나스닥|금값|환율|기준\s*금리)(?:가|는|이)?\s*(?:지금|오늘|현재|요즘)"
+    r".{0,12}(?:얼마|몇|어떻게\s*(?:돼|되|됨)|어때|알려|보여)"
 )
 # Why/whether a rate matters is explained by the catalog, never a current-rate request.
 _RATE_REASON: Final = re.compile(
@@ -310,9 +321,13 @@ def _asks_rate_now(question: str) -> bool:
 def asks_current_rate(question: str) -> bool:
     """Whether the question names a rate or price whose current value it may be asking."""
     return _RATE_NOUN.search(question) is not None
+# "연말정산 얼마 돌려받아?", "상속세 계산 좀 해줄래?" ask a tax amount as much as "세금 얼마야?" does.
+_TAX_NOUN: Final = (
+    r"(?:세후|세금|연말정산|환급|소득세|상속세|증여세|양도세|양도소득세|종합소득세|재산세|취득세|종부세|부가세)"
+)
 _TAX_CALCULATION_STATUS_REQUEST: Final = re.compile(
-    r"(?:세후|세금).{0,32}(?:정확|계산|얼마|수익)"
-    r"|(?:정확|계산|얼마|수익).{0,32}(?:세후|세금)"
+    rf"{_TAX_NOUN}.{{0,32}}(?:정확|계산|얼마|수익)"
+    rf"|(?:정확|계산|얼마|수익).{{0,32}}{_TAX_NOUN}"
 )
 # These complex investment-product terms are intentionally outside the reviewed
 # concept catalog. Their payoff and early-redemption conditions depend on the
@@ -1065,6 +1080,43 @@ def deterministic_finance_status(evidence: EvidenceInput) -> FinanceWording | No
     return wording.model_copy(update={"source": "template"})
 
 
+_FINANCE_ADVICE_TEXT: Final = (
+    "특정 상품의 가입·해지·이전이나 투자 비중, 가격·시장 전망은 판단해 드리지 않아요. "
+    "관련 금융 개념 설명이나 이번 기간 예산·소비 확인은 도와드릴 수 있어요."
+)
+
+
+def finance_advice_wording() -> FinanceWording:
+    """Decline product advice or a market outlook and say what the coach can do."""
+    return FinanceWording(
+        text=_FINANCE_ADVICE_TEXT, source="template", model="not_called", answer_status="out_of_scope",
+    )
+
+
+_REAL_ESTATE_TEXT: Final = (
+    "집·아파트 같은 부동산 매매는 한 달 예산 점검으로 판단해 드리지 않아요. "
+    "내 집 마련 자금을 목표로 모으는 저축 계획이나 이번 기간 예산·소비 확인은 도와드릴 수 있어요."
+)
+_THIRD_PARTY_TEXT: Final = (
+    "가족·지인 등 다른 사람의 돈은 연결된 자료가 없어 확인하거나 판단해 드릴 수 없어요. "
+    "본인의 예산·소비나 함께 쓰는 생활비라면 도와드릴 수 있어요."
+)
+
+
+def real_estate_wording() -> FinanceWording:
+    """Decline a home or land trade and point to a savings goal instead."""
+    return FinanceWording(
+        text=_REAL_ESTATE_TEXT, source="template", model="not_called", answer_status="out_of_scope",
+    )
+
+
+def third_party_wording() -> FinanceWording:
+    """Decline a question about another person's money, which no connected data holds."""
+    return FinanceWording(
+        text=_THIRD_PARTY_TEXT, source="template", model="not_called", answer_status="out_of_scope",
+    )
+
+
 def investment_decision_wording() -> FinanceWording:
     """Decline a buy/sell decision on a named investment and say what the coach can do."""
     return FinanceWording(
@@ -1083,6 +1135,14 @@ def names_catalog_subject(question: str) -> bool:
         len(alias) >= 2 and alias in text
         for fact in _BY_ID.values()
         for alias in (compact(name) for name in (fact.title, *fact.aliases))
+    )
+
+
+def is_catalog_subject_name(text: str) -> bool:
+    """Whether the text is exactly one catalog concept's name ("적금", "ETF"), nothing more."""
+    word = compact(text)
+    return len(word) >= 2 and any(
+        word == compact(name) for fact in _BY_ID.values() for name in (fact.title, *fact.aliases)
     )
 
 

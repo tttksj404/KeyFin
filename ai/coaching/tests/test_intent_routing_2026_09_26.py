@@ -1018,7 +1018,8 @@ def test_the_asked_piece_matches_what_the_question_left_out(question: str, code:
     ("finance", ("달러 환율이 뭔지 알려줘",), "fin_needs_source", False),
     ("finance", ("금리 높은 거 단점이 뭐야?",), "fin_needs_source", False),
     ("finance", ("지금 대출 금리 5%인데 1% 오르면 이자 얼마 늘어?",), "fin_needs_source", False),
-    ("review", ("잔액이 부족하면 카드 결제 안 돼?",), "review", False),
+    # A general finance question that is not shaped as a definition is the router's to name.
+    ("finance", ("잔액이 부족하면 카드 결제 안 돼?",), "review", False),
     ("risk", ("월말에 적금 투자 빼면 적자야?",), "numeric:risk", True),
     ("review", ("우리 집 자산이랑 부채 알려줘",), "personal", True),
     ("review", ("계좌 잔액, 부채 알려줘",), "personal", True),

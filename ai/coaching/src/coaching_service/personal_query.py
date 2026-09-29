@@ -51,8 +51,8 @@ _QUERY: Final = re.compile(
     r"(?:이번달)?(?:현재|지금)?(?:내|제|나의|저의)?(?:현재|지금)?(?:총|전체)?"
     rf"(?P<topic>{'|'.join(re.escape(name) for name in _TOPICS)})"
     r"(?:현황|내역|목록|총액|합계|상태)?(?:은|는|이|가|을|를|에)?(?:현재|지금)?(?:좀)?"
-    r"(?:얼마(?:나)?(?:야|인가요|예요|지|나돼|남았어|있어(?:요)?|나와(?:요)?|와(?:요)?)?|뭐(?:야|가있어)|어떻게돼|"
-    r"있어(?:요)?|알려(?:줘|주세요)|보여(?:줘|주세요)|조회해(?:줘|주세요)|확인해(?:줘|주세요))?[?!.]*"
+    r"(?:얼마(?:나)?(?:야|인가요|예요|지|나돼|남았어|있어(?:요)?|나와(?:요)?|와(?:요)?)?|몇원(?:이야|이에요|예요|이지)?|뭐(?:야|가있어)|어떻게돼|"
+    r"있어(?:요)?|알려(?:줘|주세요|줄래(?:요)?)|보여(?:줘|주세요|줄래(?:요)?)|조회해(?:줘|주세요)|확인해(?:줘|주세요))?[?!.]*"
 )
 
 
@@ -68,8 +68,9 @@ _LENIENT_TOPICS: Final[tuple[tuple[str, PersonalTopic], ...]] = (
     ("카드값", "payments"), ("카드대금", "payments"), ("카드청구", "payments"),
     ("결제예정", "payments"), ("예정결제", "payments"), ("명세서", "payments"),
     ("순자산", "assets"), ("재산", "assets"), ("자산", "assets"),
-    ("부채", "debts"), ("빚", "debts"), ("대출", "debts"),
+    ("부채", "debts"), ("빚", "debts"), ("대출금", "debts"), ("대출", "debts"),
     ("잔고", "accounts"), ("잔액", "accounts"), ("통장", "accounts"), ("계좌", "accounts"),
+    ("balance", "accounts"),
 )
 _LENIENT_FILTER: Final = re.compile(
     r"마이너스|학자금|전세|신용대출|자동차|주택|주거래|월급|청약|적금|입출금|저축|예금|보험|이자|은행|국민|신한|우리|하나"
@@ -77,7 +78,7 @@ _LENIENT_FILTER: Final = re.compile(
     r"|남을|남겠|될까|것같|거같|나올까|위험|부족|목표|고정비|소득|수입"
 )
 _LENIENT_ASK: Final = re.compile(
-    r"얼마|알려|보여|확인|합치|합친|전부|모든|알수있|궁금|남았|남은|남아|있어|쌓였|나왔|청구"
+    r"얼마|알려|보여|확인|합치|합친|전부|모든|알수있|궁금|남았|남은|남아|있어|쌓였|나왔|청구|몇원|파악|봐줘|check|체크"
 )
 
 
@@ -92,6 +93,7 @@ _LENIENT_WORDS: Final = tuple(sorted({
     "남았는지", "남았어", "남았지", "남은", "남아", "남았", "쌓였어", "쌓였", "나왔어", "나왔",
     "청구됐어", "청구됐", "청구된", "들어있어", "들어", "있는지", "있어", "모였어", "해줘", "줘",
     "줄래", "금액", "보유", "목록", "이랑", "랑", "하고", "돈", "의", "에", "이",
+    "몇원", "파악해줄래", "파악해줘", "파악", "나온거", "나온", "봐줘", "봐", "check", "체크",
     "가", "은", "는", "을", "를", "야", "요", "지", "어", "해",
 }, key=len, reverse=True))
 
@@ -151,13 +153,55 @@ def filtered_personal_topic(question: str) -> PersonalTopic | None:
     return _lenient_topic(_ACCOUNT_KIND.sub("", compact))
 
 
+# 은행 이름 없이 "은행 잔고"라고만 하면 계좌 전체를 묻는 말이다("국민은행 잔고"는 필터).
+_GENERIC_BANK: Final = re.compile(r"^((?:내|제|나의|저의)?)은행(?:의)?(?=잔고|잔액|계좌|통장)")
+
+
 def select_personal_topic(question: str) -> PersonalTopic | None:
     """조건의 일부만 잡아 은행·기간·비교 필터를 조용히 무시하지 않는다."""
-    compact = _DECORATION.sub("", question)
+    compact = _GENERIC_BANK.sub(r"\1", _DECORATION.sub("", question))
     matched = _QUERY.fullmatch(compact)
     if matched is not None:
         return _TOPICS[matched["topic"]]
     return _lenient_topic(re.sub(r"[?!.,]", "", compact))
+
+
+# Once the turn is a personal lookup (the router or the grammar said so), the one topic it
+# names is read and its wording is not re-judged: "다음 결제 예정 뭐 있어?", "가입한 보험이 뭐
+# 있어?", "월급이 언제 들어오지?". A bank, period, comparison or forecast is still a condition
+# the snapshot cannot honour, so it keeps the clarification instead of being dropped.
+_INTENT_TOPICS: Final[dict[str, PersonalTopic]] = {
+    **_TOPICS, **dict(_LENIENT_TOPICS),
+    "결제예정": "payments", "예정된결제": "payments", "나갈돈": "payments", "결제일": "payments",
+    "다음결제": "payments", "수입": "income",
+    "저축목표": "goals", "재산": "assets",
+}
+# The words that name the user's own data; a catalog concept named only by one of them
+# ("자산 얼마?", "다음 결제일 언제야?") is a lookup, not a definition ask.
+INTENT_TOPIC_WORDS: Final = frozenset(_INTENT_TOPICS)
+_INTENT_BLOCK: Final = re.compile(
+    r"은행|국민|신한|우리|하나|농협|카카오뱅크|토스|케이뱅크|지난달|어제|비교|차이|월말|앞으로|향후"
+    r"|예측|예상|남을|남겠|될까|것같|거같|위험|부족|이자|금리|이율"
+)
+
+
+def intent_personal_topic(question: str) -> PersonalTopic | None:
+    """Return the single topic a personal lookup names, read once its intent is known."""
+    compact = re.sub(r"[?!.,]", "", _GENERIC_BANK.sub(r"\1", _DECORATION.sub("", question)))
+    if not compact or _INTENT_BLOCK.search(compact) is not None:
+        return None
+    found: set[PersonalTopic] = set()
+    rest = compact
+    for word in sorted(_INTENT_TOPICS, key=len, reverse=True):
+        if word in rest:
+            found.add(_INTENT_TOPICS[word])
+            rest = rest.replace(word, " ")
+    for owner in ("debts", "payments", "budget"):
+        if owner in found and _ACCOUNT_TOPIC.search(compact) is None:
+            found.discard("accounts")
+    if found == {"accounts"} and "카드" in compact:
+        return None  # "카드 잔액" is not an account balance; the snapshot has no card balance
+    return next(iter(found)) if len(found) == 1 else None
 
 
 _CONNECTOR: Final = re.compile(r"이랑|랑|하고|과|와|그리고|및|둘\s*다|모두|,")

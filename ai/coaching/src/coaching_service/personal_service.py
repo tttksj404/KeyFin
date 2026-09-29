@@ -21,6 +21,7 @@ from coaching_service.personal_contract import (
 from coaching_service.personal_query import (
     filtered_personal_topic,
     has_unmatched_fragment,
+    intent_personal_topic,
     select_personal_topic,
     select_personal_topics,
 )
@@ -133,6 +134,9 @@ async def personal_summary(repository: Repository, owner: str, question: str) ->
         return summary.model_copy(update={"text": note + " " + summary.text})
     topics = select_personal_topics(question)
     if not topics:
+        intended = intent_personal_topic(question)
+        if intended is not None:
+            return await summary_for_topic(repository, owner, intended)
         return PersonalSummary(topic=None, status="needs_clarification", text=_UNSUPPORTED_TOPIC_TEXT)
     summaries = tuple([await summary_for_topic(repository, owner, item) for item in topics])
     pieces = [summary.text for summary in summaries]

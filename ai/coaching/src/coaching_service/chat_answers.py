@@ -114,6 +114,10 @@ _PURCHASE_CLARIFICATIONS: dict[str, str] = {
     "purchase_date_required": (
         "언제 구매할 예정인지 알려주세요. 오늘·내일·이번주처럼 시점을 알려주시면 그 기준으로 확인해 드릴게요."
     ),
+    "purchase_date_out_of_period": (
+        "그 날짜는 지금 점검하는 예산 기간 밖이라 이번 예산으로는 판단하기 어려워요. "
+        "이번 기간 안의 날짜로 알려주시면 확인해 드릴게요."
+    ),
 }
 
 
@@ -159,6 +163,9 @@ _PERIOD_CLARIFICATIONS: dict[str, str] = {
     ),
     "period_unsupported_calendar": (
         "그 기간 형식은 아직 지원하지 않아요. 지난달·이번 달·오늘·어제·현재까지로 알려주세요."
+    ),
+    "goal_amount_required": (
+        "얼마를 모을지 알려주세요. 목표 금액과 기한을 알려주시면 모을 수 있을지 계산해 드릴게요."
     ),
     "goal_period_required": (
         "언제까지 모을지 알려주세요. 이번 달 말이나 다음 달처럼 기간을 알려주시면 "

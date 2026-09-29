@@ -111,7 +111,7 @@ def test_select_cash_account_prefers_the_income_account_among_many() -> None:
 
 
 def two_card_fixture(user: str = "demo") -> Bootstrap:
-    """주거래 a + 보조 b 계좌, 각 계좌에서 출금되는 카드 두 장(라이브 테스트 계정 구성)."""
+    """주거래 a + 보조 b 계좌, 각 계좌에서 출금되는 카드 두 장(라이브 gaza1268 구성)."""
     base = fixture(user)
     snapshot = dict(base.snapshot.root)
     snapshot["accounts"] = [

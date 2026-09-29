@@ -257,7 +257,7 @@ class PendingClarification(Frozen):
     저장되어 재시도에도 턴 결과와 어긋나지 않는다.
     """
 
-    kind: Literal["purchase", "spending", "goal", "what_if"]
+    kind: Literal["purchase", "spending", "goal", "what_if", "period"]
     question: str = Field(min_length=1, max_length=4000)
     code: str = Field(min_length=1, max_length=120)
 

@@ -51,16 +51,25 @@ _LENIENT_ENVELOPES: Final[tuple[tuple[str, str], ...]] = (
     ("의료건강", "의료·건강"), ("취미·여가", "취미·여가"), ("취미여가", "취미·여가"), ("외식비", "외식"),
     ("식비", "외식"), ("외식", "외식"), ("교통비", "교통비"), ("교통", "교통비"), ("의료", "의료·건강"),
     ("취미", "취미·여가"), ("쇼핑", "쇼핑"), ("편의점", "편의점·마트·잡화"), ("마트", "편의점·마트·잡화"),
-    ("잡화", "편의점·마트·잡화"), ("기타", "기타"),
+    ("잡화", "편의점·마트·잡화"), ("기타", "기타"), ("편의점비", "편의점·마트·잡화"),
+    ("마트비", "편의점·마트·잡화"),
+    ("쇼핑비", "쇼핑"), ("의료비", "의료·건강"), ("병원비", "의료·건강"), ("취미비", "취미·여가"),
+    ("여가비", "취미·여가"),
 )
 _LENIENT_SPEND: Final = re.compile(
-    r"썼|쓴|나간|나갔|나왔|지출|소비|사용했|사용한|결제했|결제한|했더라|찍혔|찍힌"
+    r"썼|쓴|나간|나갔|나왔|지출|소비|사용했|사용한|사용내역|내역|결제했|결제한|했더라|찍혔|찍힌"
+    # "지난달 편의점비 얼마였어": an envelope's cost word names the spending itself.
+    r"|(?:외식|교통|편의점|마트|쇼핑|의료|병원|취미|여가)비(?:는|가|이|로)?(?:총|전체)?얼마|식비(?:는|가|로)?(?:총)?얼마"
+    r"|기록|spending|지출액|소비액|샀|들었|들어갔|씀|결제한거"
 )
-_LENIENT_ASK: Final = re.compile(r"얼마|총액|합계|금액|알려|보여|궁금|확인")
+_LENIENT_ASK: Final = re.compile(
+    r"얼마|총액|합계|금액|알려|보여|궁금|확인|어떻게|내역|봐|볼래|뭐|몇|기록|(?:지출|소비)(?:액)?(?:은|는)[?!.]*$"
+)
 _LENIENT_BLOCK: Final = re.compile(
     r"것같|거같|될까|나올까|나올지|예측|예상|전망|위험|리스크|수준|쓸까|쓰게|갈것|남을|남았|남은|예산"
     r"|이번주|지난주|저번주|주말|올해|작년"
     r"|[0-9]+월|[0-9]+일|분기|비교|차이|가맹점|카드|현금|계좌|통장|제외|말고|빼고|평균|매달|매일|몇번|몇건|건수"
+    r"|기록해|기록하|기록할|어떻게해"
 )
 
 
@@ -76,6 +85,19 @@ _LENIENT_WORDS: Final = tuple(sorted({
     "하루", "돈", "쪽으로", "쪽", "에서", "으로", "로", "에", "은", "는", "이", "가", "을", "를",
     "의", "였는지", "였어", "였지", "였더라", "이었어", "인지", "는지", "있어", "야", "요", "줘",
     "지", "어", "해", "한", "?", "!", ".", ",",
+    # "오늘 썼던 거 알려줄래", "지난달 교통비 지출 보여줄래", "지난달 기타 사용내역 봐", "뭐 썼냐"
+    "썼던거", "썼던", "쓴거", "거", "보여줄래요", "보여줄래", "보여줄수있을까요", "보여줄수있어",
+    "알려줄수있을까요", "어떻게", "사용내역", "내역", "봐줘", "볼래", "봐", "자세히", "뭐", "썼냐",
+    "였어요", "였나요", "기록", "항목", "spending", "됐어", "예요", "이에요",
+    "지출액", "소비액", "지출한", "다", "있어요", "지출은", "소비는",
+    # Degree, grouping and time fillers name no merchant or condition ("어제 가장 많이 쓴 항목이
+    # 뭐고 얼마였어요?", "이번 달 쇼핑 항목별 지출이 몇인가요?", "오늘 하루 동안 지출한 내역").
+    "가장", "제일", "많이", "몇", "대략", "대충", "항목별", "봉투별", "동안", "뭐고", "인가요",
+    "있나요", "있었어", "몇인가요", "정도",
+    # "지난달 외식 지출 정리해줘", "지난달 외식 히스토리?", "취미·여가 사용액은 몇 원입니까?"
+    "정리해줘", "정리해", "정리", "히스토리", "사용액", "사용", "몇원입니까", "입니까", "궁금해요", "봐줄래",
+    "알려줄수있어", "총액은", "얼마였는지",
+    "샀어", "샀지", "샀는지", "샀", "들었어", "들어갔어", "씀", "결제한거", "결제한것",
 }, key=len, reverse=True))
 
 # Lenient wording must split completely into allowed words, each followed only by particles
@@ -97,10 +119,15 @@ _LENIENT_FULL: Final = WordSegments(
 )
 
 
-def _lenient(compact: str) -> str | None:  # noqa: PLR0911 - one return per refusal.
-    if _LENIENT_SPEND.search(compact) is None or _LENIENT_ASK.search(compact) is None:
+def _lenient(compact: str, *, intent_known: bool = False) -> str | None:  # noqa: C901, PLR0911 - one return per refusal.
+    compact = compact.replace("이번달지금까지", "이번달").replace("이달지금까지", "이번달")
+    compact = compact.replace("이번달현재까지", "이번달").replace("이달현재까지", "이번달")
+    # Once the turn is a spending lookup, "지난달 외식?" needs neither a spending verb nor an ask.
+    if not intent_known and (_LENIENT_SPEND.search(compact) is None or _LENIENT_ASK.search(compact) is None):
         return None
     periods = {canonical for word, canonical in _LENIENT_PERIODS if word in compact}
+    if intent_known and periods == {"이번달", "지금까지"}:
+        periods = {"이번달"}  # "이번 달 spending 지금까지 얼마야"
     if len(periods) != 1:
         return None
     rest = compact
@@ -174,6 +201,15 @@ class _Period(StrEnum):
     THROUGH_NOW = "현재까지"
     UNTIL_NOW = "지금까지"
     CURRENT = "현재"
+
+
+def history_question(question: str) -> str | None:
+    """Once the turn is a spending lookup, "이번 달 지금까지 얼마?" needs no spending verb of its own.
+
+    Only the period and the envelope are read; every other word must still be one the
+    lookup can honour, so a merchant, payment or comparison is asked about, not dropped.
+    """
+    return _lenient(_DECORATION.sub("", question), intent_known=True)
 
 
 def supports_spending_question(question: str) -> bool:

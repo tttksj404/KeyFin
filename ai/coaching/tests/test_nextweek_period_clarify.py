@@ -263,8 +263,38 @@ async def test_chat_period_ambiguity_returns_needs_clarification(
         # A 200 clarification is a normal recorded turn (user + assistant message).
         session = Session.model_validate_json((await client.get(path)).content)
         assert len(session.messages) == 2
-        assert session.pending_clarification is None
+        # The asked period is kept so a bare answer ("이번 달") completes the question; a conflict
+        # with the structured analysis is not, since the analysis itself has to change.
+        pending = session.pending_clarification
+        if code == "period_conflict":
+            assert pending is None
+        else:
+            assert pending is not None
+            assert pending.kind == "period"
+            assert pending.question == body["question"]
         assert model.writes == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("question", ["한 달 뒤 예측", "음력 윤달 말까지 예측", "2026-13-45까지 예측"])
+async def test_a_bare_period_answer_completes_the_asked_question(tmp_path: Path, question: str) -> None:
+    model = RouteTo("forecast")
+    async with httpx2.AsyncClient(
+        transport=httpx2.ASGITransport(app=setup(tmp_path / "period-answer.sqlite3", model)),
+        base_url="http://test", headers={"Authorization": "Bearer " + TOKEN},
+    ) as client:
+        path = "/v1/sessions/" + await _bootstrap(client, fixture())
+        asked = await client.post(
+            path + "/messages", json={"question": question}, headers={"Idempotency-Key": "q"},
+        )
+        assert asked.json()["status"] == "needs_clarification"
+        answered = await client.post(
+            path + "/messages", json={"question": "이번 달"}, headers={"Idempotency-Key": "a"},
+        )
+        assert answered.status_code == 200, answered.text
+        assert answered.json().get("status") != "needs_clarification", answered.json().get("text")
+        session = Session.model_validate_json((await client.get(path)).content)
+        assert session.pending_clarification is None
 
 
 @pytest.mark.anyio
